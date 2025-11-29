@@ -36,15 +36,18 @@ importers:
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.6(hono@4.10.7)
+      '@paralleldrive/cuid2':
+        specifier: ^2.2.2
+        version: 2.3.1
       '@workspace/drizzle':
         specifier: workspace:*
         version: link:../../packages/drizzle
-      ai:
-        specifier: ^4.0.0
-        version: 4.3.19(react@19.1.1)(zod@3.25.76)
       dotenv:
         specifier: ^16.4.0
         version: 16.6.1
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(gel@2.2.0)(postgres@3.4.7)
       formidable:
         specifier: ^3.5.0
         version: 3.5.4
@@ -54,9 +57,6 @@ importers:
       p-queue:
         specifier: ^8.0.1
         version: 8.1.1
-      pdf-parse:
-        specifier: ^1.1.1
-        version: 1.1.4
       zod:
         specifier: ^3.24.0
         version: 3.25.76
