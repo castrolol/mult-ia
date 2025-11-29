@@ -1,5 +1,5 @@
 import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { openai } from '@ai-sdk/openai';  
 import { createTools } from './tools.js';
 
 const SYSTEM_PROMPT = `Você é um assistente especializado em análise de documentos PDF.
