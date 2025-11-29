@@ -29,11 +29,9 @@ export function FileListItem({
     <div
       className={cn(
         'flex min-h-[72px] items-center gap-4 rounded-lg p-4 justify-between',
-        variant === 'default' &&
-          'bg-card/50 dark:bg-white/[0.03]',
-        variant === 'error' &&
-          'bg-destructive/10 dark:bg-destructive/10',
-        className
+        variant === 'default' && 'bg-card/50 dark:bg-white/[0.03]',
+        variant === 'error' && 'bg-destructive/10 dark:bg-destructive/10',
+        className,
       )}
     >
       {children}
@@ -70,13 +68,10 @@ export function FileListItemIcon({
     <div
       className={cn(
         'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg',
-        variant === 'default' &&
-          'text-muted-foreground bg-muted',
-        variant === 'error' &&
-          'text-destructive bg-destructive/20',
-        variant === 'success' &&
-          'text-green-500 bg-green-500/20',
-        className
+        variant === 'default' && 'text-muted-foreground bg-muted',
+        variant === 'error' && 'text-destructive bg-destructive/20',
+        variant === 'success' && 'text-green-500 bg-green-500/20',
+        className,
       )}
     >
       {children}
@@ -111,10 +106,7 @@ export function FileListItemActions({
 }: FileListItemActionsProps) {
   return (
     <div className={cn('shrink-0', className)}>
-      <div className={cn('flex items-center gap-3', className)}>
-        {children}
-      </div>
+      <div className={cn('flex items-center gap-3', className)}>{children}</div>
     </div>
   )
 }
-

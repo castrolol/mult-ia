@@ -13,7 +13,7 @@ export function Header({ className, children }: HeaderProps) {
     <header
       className={cn(
         'flex items-center justify-between whitespace-nowrap border-b border-border px-4 py-3',
-        className
+        className,
       )}
     >
       {children}
@@ -59,7 +59,7 @@ export function HeaderNavLink({
     <a
       className={cn(
         'text-sm font-medium leading-normal text-muted-foreground hover:text-foreground transition-colors',
-        className
+        className,
       )}
       {...props}
     >
@@ -78,4 +78,3 @@ export function HeaderActions({ className, children }: HeaderActionsProps) {
     <div className={cn('flex items-center gap-6', className)}>{children}</div>
   )
 }
-
