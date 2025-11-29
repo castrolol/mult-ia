@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/api",
+  "name": "@multai/job-api",
   "version": "0.0.1",
   "private": true,
   "type": "module",

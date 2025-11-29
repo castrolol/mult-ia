@@ -1,5 +1,8 @@
 import type { ObjectId } from 'mongodb';
 
+// Re-exportar tipos de entidades
+export * from './entities.js';
+
 export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 export interface PDFDocument {
@@ -9,18 +12,6 @@ export interface PDFDocument {
   status: DocumentStatus;
   totalPages?: number;
   error?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Entity {
-  _id?: ObjectId;
-  id: string;
-  name: string;
-  description: string;
-  value: string;
-  type: string;
-  parentId?: string;
   createdAt: Date;
   updatedAt: Date;
 }

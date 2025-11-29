@@ -2,7 +2,8 @@ import { ObjectId } from 'mongodb';
 import pdfParse from 'pdf-parse';
 import { getDatabase } from '../services/database.js';
 import { downloadFile } from '../services/storage.js';
-import { analyzePageWithAI } from '../ai/agent.js';
+import { analyzeDocumentWithAI } from '../ai/agent.js';
+import { getEntityUnificationService } from '../services/entity-unification.js';
 import type { PDFDocument, ProcessJobData } from '../types/index.js';
 
 interface PageContent {
@@ -72,20 +73,28 @@ async function updateDocumentStatus(
 }
 
 /**
- * Processa um documento PDF
+ * Processa um documento PDF (edital de licitação)
  * - Baixa do Minio
  * - Extrai texto por página
- * - Envia cada página para análise da IA
+ * - Analisa com IA para extrair entidades
+ * - Unifica e deduplica entidades
  */
 export async function processDocument(data: ProcessJobData): Promise<void> {
   const { documentId, s3Key } = data;
+  const unificationService = getEntityUnificationService();
   
-  console.log(`\n📄 Processando documento: ${documentId}`);
+  console.log(`\n📄 Processando edital: ${documentId}`);
   console.log(`   S3 Key: ${s3Key}`);
   
   try {
     // Atualizar status para PROCESSING
     await updateDocumentStatus(documentId, 'PROCESSING');
+    
+    // Limpar entidades anteriores deste documento (reprocessamento)
+    const clearedCount = await unificationService.clearDocumentEntities(documentId);
+    if (clearedCount > 0) {
+      console.log(`   🗑️ ${clearedCount} entidades anteriores removidas`);
+    }
     
     // 1. Baixar PDF do Minio
     console.log('   → Baixando PDF do storage...');
@@ -102,47 +111,31 @@ export async function processDocument(data: ProcessJobData): Promise<void> {
       totalPages: pages.length,
     });
     
-    // 3. Processar cada página com IA
-    console.log('   → Analisando páginas com IA...');
+    // 3. Analisar documento completo com IA
+    console.log('   → Analisando edital com IA...\n');
     
-    let successCount = 0;
-    let failCount = 0;
-    
-    for (const page of pages) {
-      console.log(`\n   📃 Página ${page.pageNumber}/${pages.length}`);
-      
-      if (!page.text.trim()) {
-        console.log('      ⚠ Página vazia, pulando...');
-        continue;
-      }
-      
-      const result = await analyzePageWithAI(
-        page.text,
-        documentId,
-        page.pageNumber
-      );
-      
-      if (result.success) {
-        successCount++;
-        console.log(`      ✓ Análise concluída (${result.toolCalls} tool calls)`);
-      } else {
-        failCount++;
-        console.log('      ✗ Falha na análise');
-      }
-    }
+    const analysisResult = await analyzeDocumentWithAI(pages, documentId);
     
     // 4. Atualizar status final
-    const finalStatus: PDFDocument['status'] = failCount === 0 ? 'COMPLETED' : 'COMPLETED';
+    const finalStatus: PDFDocument['status'] = analysisResult.success 
+      ? 'COMPLETED' 
+      : 'FAILED';
+    
     await updateDocumentStatus(documentId, finalStatus);
     
-    console.log(`\n✅ Documento processado com sucesso!`);
-    console.log(`   Páginas analisadas: ${successCount}/${pages.length}`);
-    if (failCount > 0) {
-      console.log(`   Falhas: ${failCount}`);
+    console.log(`\n✅ Edital processado com sucesso!`);
+    console.log(`   Páginas analisadas: ${analysisResult.pagesAnalyzed}/${analysisResult.totalPages}`);
+    console.log(`   Entidades extraídas: ${analysisResult.totalEntities}`);
+    
+    if (Object.keys(analysisResult.entitiesByType).length > 0) {
+      console.log(`   Distribuição por tipo:`);
+      for (const [type, count] of Object.entries(analysisResult.entitiesByType)) {
+        console.log(`     - ${type}: ${count}`);
+      }
     }
     
   } catch (error) {
-    console.error(`\n❌ Erro ao processar documento ${documentId}:`, error);
+    console.error(`\n❌ Erro ao processar edital ${documentId}:`, error);
     
     // Atualizar status para FAILED
     await updateDocumentStatus(documentId, 'FAILED', {
@@ -152,4 +145,3 @@ export async function processDocument(data: ProcessJobData): Promise<void> {
     // Não re-lança o erro para não derrubar a fila
   }
 }
-
