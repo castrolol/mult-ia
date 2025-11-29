@@ -3,13 +3,14 @@
 ARG NODE_VERSION=22.13.1
 ARG APP_DIR=apps/job-api
 
-FROM node:${NODE_VERSION}-alpine AS base
+FROM node:${NODE_VERSION}-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN npm install -g corepack@latest \
     && corepack enable pnpm \
-    && apk add --no-cache libc6-compat ca-certificates \
-    && update-ca-certificates
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 #----------------------
@@ -64,15 +65,17 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 #----------------------
 # Runtime (Node.js API)
 #----------------------
-FROM node:${NODE_VERSION}-alpine AS runner
+FROM node:${NODE_VERSION}-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
 # Instalar certificados CA para conexões SSL/TLS
-RUN apk add --no-cache ca-certificates && update-ca-certificates
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nodejs
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 --gid nodejs nodejs
 
 ARG APP_DIR
 ENV APP_DIR=$APP_DIR
@@ -94,4 +97,3 @@ WORKDIR /app/${APP_DIR}
 EXPOSE 3002
 ENV PORT=3002
 CMD ["node", "dist/index.js"]
-
