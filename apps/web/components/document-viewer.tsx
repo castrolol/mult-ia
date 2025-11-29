@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Menu, PanelLeftClose } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import {
   HierarchyTree,
@@ -44,6 +44,7 @@ export function DocumentViewer({
   documentName = 'document_name.pdf',
 }: DocumentViewerProps) {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null)
+  const [isAsideVisible, setIsAsideVisible] = useState(true)
   const [comments, setComments] = useState<
     Record<string, Array<{ author: string; date: string; text: string }>>
   >({})
@@ -169,21 +170,57 @@ export function DocumentViewer({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="px-5 pt-2">
-        <DetailPanel>
-          <Link href="/">
-            <Button
-              variant="ghost"
-              className="w-fit gap-2 hover:bg-muted/50 transition-all duration-200"
-            >
-              <ArrowLeft size={16} />
-              Voltar
-            </Button>
-          </Link>
-        </DetailPanel>
+      {/* AppBar */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b px-5 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 hover:bg-muted/50 transition-all duration-200"
+              >
+                <ArrowLeft size={16} />
+                Voltar
+              </Button>
+            </Link>
+            <div className="h-6 w-px bg-border" />
+            <h1 className="text-lg font-semibold truncate max-w-md">
+              {documentName}
+            </h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsAsideVisible(!isAsideVisible)}
+            className="gap-2 hover:bg-muted/50 transition-all duration-200"
+            title={
+              isAsideVisible
+                ? 'Ocultar painel lateral'
+                : 'Exibir painel lateral'
+            }
+          >
+            {isAsideVisible ? (
+              <>
+                <PanelLeftClose size={16} />
+                <span className="hidden sm:inline">Ocultar Painel</span>
+              </>
+            ) : (
+              <>
+                <Menu size={16} />
+                <span className="hidden sm:inline">Exibir Painel</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
       <div className="flex h-screen w-full px-5 py-2 gap-5 bg-background/95">
-        <aside className="flex flex-col w-full max-w-sm shrink-0 gap-5 sticky top-0">
+        <aside
+          className={`flex flex-col w-full max-w-sm shrink-0 gap-5 sticky top-0 transition-all duration-300 ease-in-out ${isAsideVisible
+              ? 'translate-x-0 opacity-100'
+              : '-translate-x-full opacity-0 absolute pointer-events-none'
+            }`}
+        >
           {/* Hierarchy */}
           <HierarchyTree className="h-1/2">
             <HierarchyTreeHeader>Hierarquia</HierarchyTreeHeader>
@@ -209,7 +246,7 @@ export function DocumentViewer({
               </HierarchyTreeItem>
               <HierarchyTreeItem
                 id="prazo-y"
-                label="Prazo Y"
+                label="Prazo Y" 
                 defaultExpanded
                 content="O Prazo Y estabelece o período para a segunda fase do processo."
                 breadcrumb={[documentName, 'Prazo Y']}
@@ -283,7 +320,10 @@ export function DocumentViewer({
         </aside>
 
         {/* Main Content - Detail Panel */}
-        <DetailPanel>
+        <DetailPanel
+          className={`transition-all duration-300 ease-in-out ${isAsideVisible ? 'flex-1' : 'w-full'
+            }`}
+        >
           {selectedItem ? (
             <>
               <DetailPanelContent>
