@@ -1,0 +1,51 @@
+# Dependências
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+**/.next
+out
+**/out
+dist
+**/dist
+
+# Cache
+.turbo
+**/.turbo
+.cache
+**/.cache
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testes
+coverage
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Documentação
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Outros
+.env*.local
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+

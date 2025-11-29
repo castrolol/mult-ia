@@ -1,0 +1,82 @@
+# ============================================
+# Dockerfile para Next.js Monorepo com Turborepo
+# Otimizado para Coolify
+# ============================================
+
+FROM node:20-alpine AS base
+
+# Instala dependências necessárias
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
+
+# ============================================
+# Stage 1: Instalação de dependências
+# ============================================
+FROM base AS deps
+
+WORKDIR /app
+
+# Copia arquivos de configuração do monorepo
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+
+# Copia package.json de todos os workspaces
+COPY apps/web/package.json ./apps/web/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+
+# Instala dependências
+RUN pnpm install --frozen-lockfile
+
+# ============================================
+# Stage 2: Build da aplicação
+# ============================================
+FROM base AS builder
+
+WORKDIR /app
+
+# Copia node_modules do stage anterior
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/packages/ui/node_modules ./packages/ui/node_modules
+COPY --from=deps /app/packages/eslint-config/node_modules ./packages/eslint-config/node_modules
+COPY --from=deps /app/packages/typescript-config/node_modules ./packages/typescript-config/node_modules
+
+# Copia todo o código fonte
+COPY . .
+
+# Build do app web usando turbo (com cache)
+RUN pnpm turbo build --filter=web
+
+# ============================================
+# Stage 3: Runner de produção
+# ============================================
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Define variáveis de ambiente para produção
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Cria usuário não-root para segurança
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copia arquivos estáticos e standalone build
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+# Usa usuário não-root
+USER nextjs
+
+# Expõe a porta 3000
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Inicia a aplicação
+CMD ["node", "apps/web/server.js"]
+
