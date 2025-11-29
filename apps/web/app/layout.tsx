@@ -1,10 +1,11 @@
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Poppins } from 'next/font/google'
 
 import '@workspace/ui/globals.css'
 import { Providers } from '@/components/providers'
 
-const fontSans = Geist({
+const fontSans = Poppins({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
 })
 

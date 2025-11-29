@@ -216,10 +216,11 @@ export function DocumentViewer({
       </div>
       <div className="flex h-screen w-full px-5 py-2 gap-5 bg-background/95">
         <aside
-          className={`flex flex-col w-full max-w-sm shrink-0 gap-5 sticky top-0 transition-all duration-300 ease-in-out ${isAsideVisible
+          className={`flex flex-col w-full max-w-sm shrink-0 gap-5 sticky top-0 transition-all duration-300 ease-in-out ${
+            isAsideVisible
               ? 'translate-x-0 opacity-100'
               : '-translate-x-full opacity-0 absolute pointer-events-none'
-            }`}
+          }`}
         >
           {/* Hierarchy */}
           <HierarchyTree className="h-1/2">
@@ -246,7 +247,7 @@ export function DocumentViewer({
               </HierarchyTreeItem>
               <HierarchyTreeItem
                 id="prazo-y"
-                label="Prazo Y" 
+                label="Prazo Y"
                 defaultExpanded
                 content="O Prazo Y estabelece o período para a segunda fase do processo."
                 breadcrumb={[documentName, 'Prazo Y']}
@@ -321,8 +322,9 @@ export function DocumentViewer({
 
         {/* Main Content - Detail Panel */}
         <DetailPanel
-          className={`transition-all duration-300 ease-in-out ${isAsideVisible ? 'flex-1' : 'w-full'
-            }`}
+          className={`transition-all duration-300 ease-in-out ${
+            isAsideVisible ? 'flex-1' : 'w-full'
+          }`}
         >
           {selectedItem ? (
             <>
