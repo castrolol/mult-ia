@@ -1,0 +1,10 @@
+{
+    "configurations": [
+    {
+        "command": "pnpm dev",
+        "name": "Run web",
+        "request": "launch",
+        "type": "node-terminal"
+    }
+    ]
+}
