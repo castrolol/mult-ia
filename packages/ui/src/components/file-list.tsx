@@ -28,9 +28,11 @@ export function FileListItem({
   return (
     <div
       className={cn(
-        'flex min-h-[72px] items-center gap-4 rounded-lg p-4 justify-between',
-        variant === 'default' && 'bg-card/50 dark:bg-white/[0.03]',
-        variant === 'error' && 'bg-destructive/10 dark:bg-destructive/10',
+        'flex min-h-[80px] items-center gap-4 rounded-xl p-4 justify-between border transition-all duration-200',
+        variant === 'default' &&
+          'bg-card/60 border-border/40 shadow-sm hover:shadow-md hover:border-border/60',
+        variant === 'error' &&
+          'bg-destructive/10 border-destructive/20 dark:bg-destructive/10',
         className,
       )}
     >
@@ -67,10 +69,13 @@ export function FileListItemIcon({
   return (
     <div
       className={cn(
-        'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg',
-        variant === 'default' && 'text-muted-foreground bg-muted',
-        variant === 'error' && 'text-destructive bg-destructive/20',
-        variant === 'success' && 'text-green-500 bg-green-500/20',
+        'flex h-14 w-14 shrink-0 items-center justify-center rounded-xl shadow-sm',
+        variant === 'default' &&
+          'text-muted-foreground bg-muted/60 border border-border/40',
+        variant === 'error' &&
+          'text-destructive bg-destructive/15 border border-destructive/20',
+        variant === 'success' &&
+          'text-green-600 bg-green-500/15 border border-green-500/20 dark:text-green-400',
         className,
       )}
     >

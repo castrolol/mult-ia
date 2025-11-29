@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { FileText, Check, X, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -146,7 +147,7 @@ export function PDFUploader() {
           <div className="flex w-full max-w-4xl flex-col gap-8">
             <Header>
               <HeaderLogo>
-                <div className="size-6 text-primary">
+                <div className="size-7 text-primary">
                   <svg
                     fill="none"
                     viewBox="0 0 48 48"
@@ -158,7 +159,7 @@ export function PDFUploader() {
                     />
                   </svg>
                 </div>
-                <h2 className="text-lg font-bold leading-tight tracking-[-0.015em] text-foreground">
+                <h2 className="text-xl font-bold leading-tight tracking-tight text-foreground">
                   MultiAI PDF Uploader
                 </h2>
               </HeaderLogo>
@@ -168,17 +169,17 @@ export function PDFUploader() {
                   <HeaderNavLink href="#">History</HeaderNavLink>
                   <HeaderNavLink href="#">Settings</HeaderNavLink>
                 </HeaderNav>
-                <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-9 border-2 border-primary bg-gradient-to-br from-primary/20 to-primary/40" />
+                <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/60 bg-gradient-to-br from-primary/20 to-primary/40 shadow-sm" />
               </HeaderActions>
             </Header>
 
             <main className="flex flex-col gap-8">
               <div className="flex flex-wrap justify-between gap-3 px-4">
-                <div className="flex min-w-72 flex-col gap-2">
-                  <p className="text-4xl font-black leading-tight tracking-[-0.033em] text-foreground">
+                <div className="flex min-w-72 flex-col gap-3">
+                  <p className="text-4xl font-black leading-tight tracking-tight text-foreground">
                     Upload Your PDF Documents
                   </p>
-                  <p className="text-base font-normal leading-normal text-muted-foreground">
+                  <p className="text-base font-normal leading-relaxed text-muted-foreground">
                     Drag and drop files to start processing with MultiAI.
                   </p>
                 </div>
@@ -186,100 +187,129 @@ export function PDFUploader() {
 
               <UploadArea onDrop={handleDrop} />
 
-              <h2 className="text-[22px] font-bold leading-tight tracking-[-0.015em] text-foreground px-4 pb-3 pt-5">
+              <h2 className="text-2xl font-bold leading-tight tracking-tight text-foreground px-4 pb-3 pt-5">
                 Processing Files
               </h2>
 
               <FileList>
-                {files.map((file) => (
-                  <FileListItem
-                    key={file.id}
-                    variant={file.status === 'error' ? 'error' : 'default'}
-                  >
-                    <FileListItemContent>
-                      <FileListItemIcon
-                        variant={
-                          file.status === 'error'
-                            ? 'error'
-                            : file.status === 'completed'
-                              ? 'success'
-                              : 'default'
-                        }
-                      >
-                        <FileText size={24} />
-                      </FileListItemIcon>
-                      <FileListItemInfo>
-                        <p className="text-base font-medium leading-normal line-clamp-1 text-foreground">
-                          {file.name}
-                        </p>
-                        {file.status === 'error' ? (
-                          <p className="text-sm font-normal leading-normal line-clamp-2 text-destructive">
-                            {file.error}
+                {files.map((file) => {
+                  const isClickable = file.status === 'completed'
+                  const cardContent = (
+                    <>
+                      <FileListItemContent>
+                        <FileListItemIcon
+                          variant={
+                            file.status === 'error'
+                              ? 'error'
+                              : file.status === 'completed'
+                                ? 'success'
+                                : 'default'
+                          }
+                        >
+                          <FileText size={24} />
+                        </FileListItemIcon>
+                        <FileListItemInfo>
+                          <p className="text-base font-medium leading-normal line-clamp-1 text-foreground">
+                            {file.name}
                           </p>
-                        ) : file.status === 'processing' ? (
-                          <p className="text-sm font-normal leading-normal line-clamp-2 text-primary">
-                            Processing...
-                          </p>
-                        ) : file.status === 'completed' ? (
-                          <p className="text-sm font-normal leading-normal line-clamp-2 text-green-500">
-                            Completed
-                          </p>
-                        ) : (
-                          <p className="text-sm font-normal leading-normal line-clamp-2 text-muted-foreground">
-                            {formatFileSize(file.size)}
-                          </p>
+                          {file.status === 'error' ? (
+                            <p className="text-sm font-normal leading-normal line-clamp-2 text-destructive">
+                              {file.error}
+                            </p>
+                          ) : file.status === 'processing' ? (
+                            <p className="text-sm font-normal leading-normal line-clamp-2 text-primary">
+                              Processing...
+                            </p>
+                          ) : file.status === 'completed' ? (
+                            <p className="text-sm font-normal leading-normal line-clamp-2 text-green-500">
+                              Completed - Click to view
+                            </p>
+                          ) : (
+                            <p className="text-sm font-normal leading-normal line-clamp-2 text-muted-foreground">
+                              {formatFileSize(file.size)}
+                            </p>
+                          )}
+                        </FileListItemInfo>
+                      </FileListItemContent>
+                      <FileListItemActions>
+                        {file.status === 'uploading' && (
+                          <>
+                            <div className="w-28 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className="h-2 rounded-full bg-primary transition-all"
+                                style={{ width: `${file.progress || 0}%` }}
+                              />
+                            </div>
+                            <p className="w-10 text-right text-sm font-medium leading-normal text-muted-foreground">
+                              {file.progress}%
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                handleDelete(file.id)
+                              }}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <X size={20} />
+                            </Button>
+                          </>
                         )}
-                      </FileListItemInfo>
-                    </FileListItemContent>
-                    <FileListItemActions>
-                      {file.status === 'uploading' && (
-                        <>
-                          <div className="w-28 overflow-hidden rounded-full bg-muted">
-                            <div
-                              className="h-2 rounded-full bg-primary transition-all"
-                              style={{ width: `${file.progress || 0}%` }}
-                            />
+                        {file.status === 'processing' && (
+                          <div
+                            className="flex items-center justify-center"
+                            role="status"
+                          >
+                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            <span className="sr-only">Loading...</span>
                           </div>
-                          <p className="w-10 text-right text-sm font-medium leading-normal text-muted-foreground">
-                            {file.progress}%
-                          </p>
+                        )}
+                        {file.status === 'completed' && (
+                          <div className="flex size-8 items-center justify-center rounded-full bg-green-500/20 text-green-500">
+                            <Check size={20} />
+                          </div>
+                        )}
+                        {file.status === 'error' && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDelete(file.id)}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handleDelete(file.id)
+                            }}
                             className="text-muted-foreground hover:text-foreground"
                           >
-                            <X size={20} />
+                            <Trash2 size={20} />
                           </Button>
-                        </>
-                      )}
-                      {file.status === 'processing' && (
-                        <div
-                          className="flex items-center justify-center"
-                          role="status"
+                        )}
+                      </FileListItemActions>
+                    </>
+                  )
+
+                  return (
+                    <FileListItem
+                      key={file.id}
+                      variant={file.status === 'error' ? 'error' : 'default'}
+                      className={
+                        isClickable
+                          ? 'cursor-pointer hover:bg-card/80 transition-colors'
+                          : ''
+                      }
+                    >
+                      {isClickable ? (
+                        <Link
+                          href={`/documents/${file.id}?name=${encodeURIComponent(file.name)}`}
+                          className="flex w-full items-center justify-between"
                         >
-                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                          <span className="sr-only">Loading...</span>
-                        </div>
+                          {cardContent}
+                        </Link>
+                      ) : (
+                        cardContent
                       )}
-                      {file.status === 'completed' && (
-                        <div className="flex size-8 items-center justify-center rounded-full bg-green-500/20 text-green-500">
-                          <Check size={20} />
-                        </div>
-                      )}
-                      {file.status === 'error' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(file.id)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <Trash2 size={20} />
-                        </Button>
-                      )}
-                    </FileListItemActions>
-                  </FileListItem>
-                ))}
+                    </FileListItem>
+                  )
+                })}
               </FileList>
             </main>
           </div>

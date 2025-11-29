@@ -12,7 +12,7 @@ export function Header({ className, children }: HeaderProps) {
   return (
     <header
       className={cn(
-        'flex items-center justify-between whitespace-nowrap border-b border-border px-4 py-3',
+        'flex items-center justify-between whitespace-nowrap border-b border-border/60 bg-card/50 backdrop-blur-sm px-6 py-4 shadow-sm',
         className,
       )}
     >
@@ -58,7 +58,7 @@ export function HeaderNavLink({
   return (
     <a
       className={cn(
-        'text-sm font-medium leading-normal text-muted-foreground hover:text-foreground transition-colors',
+        'text-sm font-medium leading-normal text-muted-foreground hover:text-foreground transition-all duration-200 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all after:duration-200 hover:after:w-full',
         className,
       )}
       {...props}
