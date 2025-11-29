@@ -15,7 +15,30 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["GOOGLE_GENERATIVE_AI_API_KEY","DATABASE_URL"]
+    },
+   "migrate": {
+      "dependsOn": [
+        "^migrate"
+      ],
+      "env": [
+        "DATABASE_URL"
+      ]
+    },
+    "grt": {
+      "dependsOn": [
+        "^grt"
+      ],
+      "outputs": [
+        "../../packages/drizzle/entities/**"
+      ],
+      "env": [
+        "DATABASE_URL",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "NEXT_PUBLIC_APP_URL"
+      ]
     }
   }
 }
