@@ -1,0 +1,30 @@
+{
+    "name": "@workspace/drizzle",
+    "version": "0.0.0",
+    "private": true,
+    "main": "./index.ts",
+    "types": "./index.ts",
+    "exports": {
+        ".": "./index.ts",
+        "./storage": "./storage.ts"
+    },
+    "scripts": {
+        "migrate": "drizzle-kit migrate",
+        "grt": "drizzle-kit generate",
+        "push": "drizzle-kit push",
+        "studio": "drizzle-kit studio"
+    },
+    "devDependencies": {
+        "@types/node": "24.10.0",
+        "@workspace/eslint-config": "workspace:^",
+        "@workspace/typescript-config": "workspace:^",
+        "drizzle-kit": "^0.30.0",
+        "eslint": "9.39.1"
+    },
+    "dependencies": {
+        "@neondatabase/serverless": "^1.0.2",
+        "@paralleldrive/cuid2": "^2.2.2",
+        "drizzle-orm": "^0.44.7",
+        "zod": "^4.1.12"
+    }
+}

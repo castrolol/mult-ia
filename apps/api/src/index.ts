@@ -14,7 +14,7 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', cors());
 
-// Rotas
+// Routes
 app.route('/upload', upload);
 app.route('/documents', documents);
 
@@ -37,18 +37,19 @@ app.notFound((c) => {
 // Inicialização
 async function main() {
   try {
-    // Conectar ao MongoDB
+    // Conectar ao PostgreSQL
     await connectDatabase();
 
     // Iniciar servidor
-    const port = parseInt(process.env.PORT || '3000', 10);
-    
-    console.log(`\n🚀 API rodando em http://localhost:${port}`);
+    const port = parseInt(process.env.PORT || '3001', 10);
+
+    console.log(`\n🚀 Servidor Hono rodando em http://localhost:${port}`);
     console.log('   Endpoints:');
-    console.log('   - POST /upload           → Upload de PDF');
-    console.log('   - GET  /documents        → Listar documentos');
-    console.log('   - GET  /documents/:id    → Status do documento');
-    console.log('   - GET  /health           → Health check\n');
+    console.log('   - POST /upload              → Upload de PDF');
+    console.log('   - GET  /upload/:id          → Status do documento');
+    console.log('   - GET  /api/documents       → Listar documentos');
+    console.log('   - GET  /api/documents/:id   → Detalhes do documento');
+    console.log('   - GET  /health              → Health check\n');
 
     serve({
       fetch: app.fetch,

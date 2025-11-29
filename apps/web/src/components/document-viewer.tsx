@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -9,6 +9,9 @@ import {
   Menu,
   PanelLeftClose,
   Sparkles,
+  Loader2,
+  AlertCircle,
+  Play,
 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -31,7 +34,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@workspace/ui/components/card'
-import { PDFViewerEmptyState } from '@workspace/ui/components/pdf-viewer'
+import { useDocument, useProcessDocument } from '@/lib/hooks/use-documents'
+import type { Entity, Deadline, Penalty } from '@/lib/api-client'
 
 interface SelectedItem {
   id: string
@@ -43,17 +47,22 @@ interface SelectedItem {
 }
 
 interface DocumentViewerProps {
+  documentId?: string
   documentName?: string
 }
 
 export function DocumentViewer({
-  documentName = 'document_name.pdf',
+  documentId,
+  documentName: propDocumentName,
 }: DocumentViewerProps) {
+  const { document, entities, deadlines, timeline, loading, error } =
+    useDocument(documentId)
+  const { process, processing } = useProcessDocument()
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null)
   const [isAsideVisible, setIsAsideVisible] = useState(true)
-  const [comments, setComments] = useState<
-    Record<string, Array<{ author: string; date: string; text: string }>>
-  >({})
+
+  const documentName =
+    propDocumentName || document?.filename || 'document_name.pdf'
 
   const handleHierarchySelect = (item: HierarchyTreeItemData) => {
     setSelectedItem({
@@ -77,101 +86,205 @@ export function DocumentViewer({
     })
   }
 
-  const handleAddComment = (comment: string) => {
-    if (!selectedItem) return
-
-    const newComment = {
-      author: 'Você',
-      date: new Date().toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      text: comment,
-    }
-
-    setComments((prev) => ({
-      ...prev,
-      [selectedItem.id]: [...(prev[selectedItem.id] || []), newComment],
-    }))
-  }
-
   const getItemNotes = (
     itemId: string,
     defaultNotes?: SelectedItem['notes'],
   ) => {
-    const savedComments = comments[itemId] || []
-    return [...(defaultNotes || []), ...savedComments]
+    return defaultNotes || []
   }
 
-  // Dados de exemplo para a hierarquia
-  const hierarchyData = {
-    prazoX: {
-      id: 'prazo-x',
-      content:
-        'O Prazo X refere-se ao período estabelecido para entrega dos documentos iniciais do processo. Este prazo é improrrogável e deve ser cumprido rigorosamente conforme estabelecido no edital.',
-      notes: [
-        {
-          author: 'Sistema',
-          date: '29/11/2025 14:30',
-          text: 'Prazo identificado automaticamente no documento.',
-        },
-      ],
-      breadcrumb: [documentName, 'Prazo X'],
-    },
-    regras: {
-      id: 'regras',
-      content:
-        'As regras definem os critérios e procedimentos que devem ser seguidos durante todo o processo. O não cumprimento das regras pode resultar em penalidades conforme descrito na seção de multas.',
-      notes: [],
-      breadcrumb: [documentName, 'Prazo Y', 'Regras'],
-    },
-    multaX: {
-      id: 'multa-x',
-      content:
-        'A Multa X corresponde a 2% do valor total do contrato, aplicável em caso de descumprimento do prazo estabelecido. O valor será deduzido automaticamente do pagamento subsequente.',
-      notes: [
-        {
-          author: 'João Silva',
-          date: '29/11/2025 10:15',
-          text: 'O fulano já solicitou com a TI para gerar os documentos necessários, falar com XXXXXX',
-        },
-      ],
-      breadcrumb: [documentName, 'Prazo Y', 'Regras', 'Multa X'],
-    },
+  const handleProcessDocument = async () => {
+    if (!documentId) return
+    try {
+      await process(documentId)
+      // Refresh will happen automatically via useDocument hook
+    } catch (err) {
+      console.error('Error processing document:', err)
+    }
   }
 
-  // Dados de exemplo para a timeline
-  const timelineData = {
-    enviado: {
-      id: 'doc-enviado',
-      content:
-        'O documento foi recebido pelo sistema e está aguardando processamento. Todos os metadados foram extraídos com sucesso e o arquivo está íntegro.',
+  // Convert entities to hierarchy tree structure
+  const entityHierarchy = useMemo(() => {
+    if (!entities || entities.length === 0) {
+      return {
+        rootEntities: [] as Entity[],
+        childMap: new Map<string, Entity[]>(),
+      }
+    }
+
+    // Group entities by parent
+    const rootEntities = entities.filter((e) => !e.parentId)
+    const childMap = new Map<string, Entity[]>()
+    entities.forEach((e) => {
+      if (e.parentId) {
+        if (!childMap.has(e.parentId)) {
+          childMap.set(e.parentId, [])
+        }
+        childMap.get(e.parentId)?.push(e)
+      }
+    })
+
+    return { rootEntities, childMap }
+  }, [entities])
+
+  // Render entity hierarchy recursively
+  const renderEntityItem = (entity: Entity) => {
+    const children = entityHierarchy.childMap.get(entity.id) || []
+    const breadcrumb = [documentName, entity.name]
+
+    return (
+      <HierarchyTreeItem
+        key={entity.id}
+        id={entity.id}
+        label={entity.name}
+        defaultExpanded={children.length > 0}
+        content={entity.description || entity.sourceText || ''}
+        notes={
+          entity.metadata
+            ? [
+                {
+                  author: 'Sistema',
+                  date: new Date(entity.createdAt).toLocaleString('pt-BR'),
+                  text: `Tipo: ${entity.type} | Prioridade: ${entity.priority}`,
+                },
+              ]
+            : []
+        }
+        breadcrumb={breadcrumb}
+        isActive={selectedItem?.id === entity.id}
+        onSelect={handleHierarchySelect}
+      >
+        {children.map(renderEntityItem)}
+      </HierarchyTreeItem>
+    )
+  }
+
+  // Render deadline hierarchy
+  const renderDeadlineItem = (deadline: Deadline) => {
+    const hasRules = deadline.rules.length > 0
+    const hasPenalties = deadline.penalties && deadline.penalties.length > 0
+
+    return (
+      <HierarchyTreeItem
+        key={deadline.id}
+        id={deadline.id}
+        label={deadline.title}
+        defaultExpanded={hasRules || hasPenalties}
+        content={`${deadline.description}\n\nPrazo: ${new Date(deadline.dueDate).toLocaleDateString('pt-BR')}\nPrioridade: ${deadline.priority}`}
+        notes={[
+          {
+            author: 'Sistema',
+            date: new Date(deadline.createdAt).toLocaleString('pt-BR'),
+            text: `Status: ${deadline.status}`,
+          },
+        ]}
+        breadcrumb={[documentName, deadline.title]}
+        isActive={selectedItem?.id === deadline.id}
+        onSelect={handleHierarchySelect}
+      >
+        {hasRules && (
+          <HierarchyTreeItem
+            id={`rules-${deadline.id}`}
+            label="Regras"
+            content={`Total de ${deadline.rules.length} regras`}
+            breadcrumb={[documentName, deadline.title, 'Regras']}
+            isActive={selectedItem?.id === `rules-${deadline.id}`}
+            onSelect={handleHierarchySelect}
+          >
+            {deadline.rules.map((rule: string, index: number) => (
+              <HierarchyTreeItem
+                key={`rule-${deadline.id}-${index}`}
+                id={`rule-${deadline.id}-${index}`}
+                label={`Regra ${index + 1}`}
+                content={rule}
+                breadcrumb={[
+                  documentName,
+                  deadline.title,
+                  'Regras',
+                  `Regra ${index + 1}`,
+                ]}
+                isActive={selectedItem?.id === `rule-${deadline.id}-${index}`}
+                onSelect={handleHierarchySelect}
+              />
+            ))}
+          </HierarchyTreeItem>
+        )}
+        {hasPenalties && (
+          <HierarchyTreeItem
+            id={`penalties-${deadline.id}`}
+            label="Multas"
+            content={`Total de ${deadline.penalties?.length || 0} multas`}
+            breadcrumb={[documentName, deadline.title, 'Multas']}
+            isActive={selectedItem?.id === `penalties-${deadline.id}`}
+            onSelect={handleHierarchySelect}
+          >
+            {deadline.penalties?.map((penalty: Penalty) => (
+              <HierarchyTreeItem
+                key={penalty.id}
+                id={penalty.id}
+                label={`Multa: ${penalty.description}`}
+                content={`Tipo: ${penalty.type} | Valor: ${penalty.value} ${penalty.currency || 'BRL'}`}
+                breadcrumb={[
+                  documentName,
+                  deadline.title,
+                  'Multas',
+                  penalty.description,
+                ]}
+                isActive={selectedItem?.id === penalty.id}
+                onSelect={handleHierarchySelect}
+              />
+            ))}
+          </HierarchyTreeItem>
+        )}
+      </HierarchyTreeItem>
+    )
+  }
+
+  // Convert timeline events to timeline items
+  const timelineItems = useMemo(() => {
+    if (!timeline || timeline.length === 0) return []
+
+    return timeline.map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.date,
+      time: event.time || undefined,
+      content: event.metadata
+        ? JSON.stringify(event.metadata, null, 2)
+        : event.description,
       notes: [],
-      breadcrumb: [documentName, 'Documento Enviado'],
-    },
-    processamento: {
-      id: 'processamento',
-      content:
-        'O sistema está analisando o conteúdo do documento utilizando inteligência artificial para identificar cláusulas, prazos e obrigações relevantes.',
-      notes: [],
-      breadcrumb: [documentName, 'Processamento'],
-    },
-    analise: {
-      id: 'analise-concluida',
-      content:
-        'A análise do documento foi concluída com sucesso. Foram identificados 3 prazos, 5 regras e 2 multas potenciais. Revise os itens na hierarquia ao lado.',
-      notes: [
-        {
-          author: 'Sistema IA',
-          date: '29/11/2025 14:35',
-          text: 'Análise automática concluída. Confiança: 94%',
-        },
-      ],
-      breadcrumb: [documentName, 'Análise Concluída'],
-    },
+      breadcrumb: [documentName, event.title],
+    }))
+  }, [timeline, documentName])
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando documento...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error || !document) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">
+            Erro ao carregar documento
+          </h2>
+          <p className="text-muted-foreground">
+            {error || 'Documento não encontrado'}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -194,6 +307,27 @@ export function DocumentViewer({
             <h1 className="text-lg font-semibold truncate max-w-md">
               {documentName}
             </h1>
+            {document.status === 'pending' && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleProcessDocument}
+                disabled={processing}
+                className="gap-2"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} />
+                    Processar Documento
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -235,40 +369,27 @@ export function DocumentViewer({
               <Timeline className="h-full w-full">
                 <TimelineHeader>Timeline</TimelineHeader>
                 <TimelineContent>
-                  <TimelineItem
-                    id="doc-enviado"
-                    title="Documento Enviado"
-                    description="Upload do documento realizado com sucesso."
-                    date="29/11/2025"
-                    time="14:30"
-                    content={timelineData.enviado.content}
-                    breadcrumb={timelineData.enviado.breadcrumb}
-                    isActive={selectedItem?.id === 'doc-enviado'}
-                    onSelect={handleTimelineSelect}
-                  />
-                  <TimelineItem
-                    id="processamento"
-                    title="Processamento"
-                    description="Documento em análise pelo sistema."
-                    date="29/11/2025"
-                    time="14:32"
-                    content={timelineData.processamento.content}
-                    breadcrumb={timelineData.processamento.breadcrumb}
-                    isActive={selectedItem?.id === 'processamento'}
-                    onSelect={handleTimelineSelect}
-                  />
-                  <TimelineItem
-                    id="analise-concluida"
-                    title="Análise Concluída"
-                    description="Extração de dados finalizada."
-                    date="29/11/2025"
-                    time="14:35"
-                    content={timelineData.analise.content}
-                    notes={timelineData.analise.notes}
-                    breadcrumb={timelineData.analise.breadcrumb}
-                    isActive={selectedItem?.id === 'analise-concluida'}
-                    onSelect={handleTimelineSelect}
-                  />
+                  {timelineItems.length > 0 ? (
+                    timelineItems.map((item) => (
+                      <TimelineItem
+                        key={item.id}
+                        id={item.id}
+                        title={item.title}
+                        description={item.description}
+                        date={item.date}
+                        time={item.time}
+                        content={item.content}
+                        notes={item.notes}
+                        breadcrumb={item.breadcrumb}
+                        isActive={selectedItem?.id === item.id}
+                        onSelect={handleTimelineSelect}
+                      />
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground">
+                      Nenhum evento na timeline ainda
+                    </div>
+                  )}
                 </TimelineContent>
               </Timeline>
             </aside>
@@ -308,55 +429,22 @@ export function DocumentViewer({
             <HierarchyTree className="flex-1">
               <HierarchyTreeHeader>Hierarquia</HierarchyTreeHeader>
               <HierarchyTreeContent>
-                <HierarchyTreeItem
-                  id="prazo-x"
-                  label="Prazo X"
-                  defaultExpanded
-                  content={hierarchyData.prazoX.content}
-                  notes={hierarchyData.prazoX.notes}
-                  breadcrumb={hierarchyData.prazoX.breadcrumb}
-                  isActive={selectedItem?.id === 'prazo-x'}
-                  onSelect={handleHierarchySelect}
-                >
-                  <HierarchyTreeItem
-                    id="prazo-x-regras"
-                    label="Regras"
-                    content={hierarchyData.regras.content}
-                    breadcrumb={[documentName, 'Prazo X', 'Regras']}
-                    isActive={selectedItem?.id === 'prazo-x-regras'}
-                    onSelect={handleHierarchySelect}
-                  />
-                </HierarchyTreeItem>
-                <HierarchyTreeItem
-                  id="prazo-y"
-                  label="Prazo Y"
-                  defaultExpanded
-                  content="O Prazo Y estabelece o período para a segunda fase do processo."
-                  breadcrumb={[documentName, 'Prazo Y']}
-                  isActive={selectedItem?.id === 'prazo-y'}
-                  onSelect={handleHierarchySelect}
-                >
-                  <HierarchyTreeItem
-                    id="regras"
-                    label="Regras"
-                    defaultExpanded
-                    content={hierarchyData.regras.content}
-                    notes={hierarchyData.regras.notes}
-                    breadcrumb={hierarchyData.regras.breadcrumb}
-                    isActive={selectedItem?.id === 'regras'}
-                    onSelect={handleHierarchySelect}
-                  >
-                    <HierarchyTreeItem
-                      id="multa-x"
-                      label="Multa X"
-                      content={hierarchyData.multaX.content}
-                      notes={hierarchyData.multaX.notes}
-                      breadcrumb={hierarchyData.multaX.breadcrumb}
-                      isActive={selectedItem?.id === 'multa-x'}
-                      onSelect={handleHierarchySelect}
-                    />
-                  </HierarchyTreeItem>
-                </HierarchyTreeItem>
+                {entityHierarchy.rootEntities.length > 0 ||
+                (deadlines && deadlines.length > 0) ? (
+                  <>
+                    {entityHierarchy.rootEntities.map(renderEntityItem)}
+                    {deadlines?.map(renderDeadlineItem)}
+                  </>
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">
+                    Nenhum item na hierarquia ainda
+                    {document.status === 'pending' && (
+                      <p className="text-sm mt-2">
+                        Processe o documento para ver a hierarquia
+                      </p>
+                    )}
+                  </div>
+                )}
               </HierarchyTreeContent>
             </HierarchyTree>
 

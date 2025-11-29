@@ -1,35 +1,13 @@
-import { MongoClient, Db } from 'mongodb';
+// Database connection validation for PostgreSQL with Drizzle
+import { db } from '../lib/db.js'
 
-let client: MongoClient | null = null;
-let db: Db | null = null;
-
-export async function connectDatabase(): Promise<Db> {
-  if (db) return db;
-
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/multia';
-  
-  client = new MongoClient(uri);
-  await client.connect();
-  
-  db = client.db();
-  console.log('✓ Conectado ao MongoDB');
-  
-  return db;
-}
-
-export function getDatabase(): Db {
-  if (!db) {
-    throw new Error('Database não inicializado. Chame connectDatabase() primeiro.');
-  }
-  return db;
-}
-
-export async function closeDatabase(): Promise<void> {
-  if (client) {
-    await client.close();
-    client = null;
-    db = null;
-    console.log('✓ Desconectado do MongoDB');
+export async function connectDatabase(): Promise<void> {
+  try {
+    // Test database connection by executing a simple query
+    await db.execute('SELECT 1')
+    console.log('✓ Conectado ao PostgreSQL via Drizzle')
+  } catch (error) {
+    console.error('Erro ao conectar ao banco de dados:', error)
+    throw error
   }
 }
-

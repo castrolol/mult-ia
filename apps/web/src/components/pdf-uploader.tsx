@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FileText, Check, X, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
@@ -14,6 +15,7 @@ import {
   FileListItemActions,
 } from '@workspace/ui/components/file-list'
 import type { FileRejection } from 'react-dropzone'
+import { useUploadDocument, useDocuments } from '@/lib/hooks/use-documents'
 
 type FileStatus = 'uploading' | 'processing' | 'completed' | 'error'
 
@@ -27,40 +29,38 @@ interface FileItem {
 }
 
 export function PDFUploader() {
-  const [files, setFiles] = useState<FileItem[]>([
-    {
-      id: '1',
-      name: 'financial_report_q3.pdf',
-      size: 12.8 * 1024 * 1024,
-      status: 'uploading',
-      progress: 45,
-    },
-    {
-      id: '2',
-      name: 'project_proposal_final.pdf',
-      status: 'processing',
-    },
-    {
-      id: '3',
-      name: 'document_final_v2.pdf',
-      status: 'completed',
-    },
-    {
-      id: '4',
-      name: 'invalid_document.docx',
-      status: 'error',
-      error: 'Error: Invalid file type',
-    },
-  ])
+  const router = useRouter()
+  const { upload, uploading, error: uploadError } = useUploadDocument()
+  const { documents, refetch } = useDocuments()
+  const [files, setFiles] = useState<FileItem[]>([])
 
-  const handleDrop = (
+  // Sync files with documents from API
+  useEffect(() => {
+    const fileItems: FileItem[] = documents.map((doc) => ({
+      id: doc.id,
+      name: doc.filename,
+      status:
+        doc.status === 'pending'
+          ? 'uploading'
+          : doc.status === 'processing'
+            ? 'processing'
+            : doc.status === 'completed'
+              ? 'completed'
+              : 'error',
+      error: doc.error || undefined,
+    }))
+    setFiles(fileItems)
+  }, [documents])
+
+  const handleDrop = async (
     acceptedFiles: File[],
     fileRejections: FileRejection[],
   ) => {
     // Handle accepted files
-    acceptedFiles.forEach((file) => {
+    for (const file of acceptedFiles) {
+      const tempId = `temp-${Date.now()}-${Math.random()}`
       const newFile: FileItem = {
-        id: Date.now().toString(),
+        id: tempId,
         name: file.name,
         size: file.size,
         status: 'uploading',
@@ -68,48 +68,75 @@ export function PDFUploader() {
       }
       setFiles((prev) => [...prev, newFile])
 
-      // Simulate upload progress
-      const interval = setInterval(() => {
+      try {
+        // Simulate progress
+        const progressInterval = setInterval(() => {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === tempId
+                ? {
+                    ...f,
+                    progress: Math.min((f.progress || 0) + 20, 90),
+                  }
+                : f,
+            ),
+          )
+        }, 200)
+
+        const result = await upload(file)
+
+        clearInterval(progressInterval)
+
+        if (result.success && result.data) {
+          // Update file with real document ID
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === tempId
+                ? {
+                    ...f,
+                    id: result.data.document.id,
+                    status: 'processing',
+                    progress: 100,
+                  }
+                : f,
+            ),
+          )
+
+          // Refresh documents list
+          await refetch()
+
+          // Navigate to document after a short delay
+          setTimeout(() => {
+            router.push(
+              `/documents/${result.data.document.id}?name=${encodeURIComponent(result.data.document.filename)}`,
+            )
+          }, 1000)
+        }
+      } catch (err) {
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === newFile.id
+            f.id === tempId
               ? {
                   ...f,
-                  progress: Math.min((f.progress || 0) + 10, 100),
+                  status: 'error',
+                  error:
+                    err instanceof Error
+                      ? err.message
+                      : 'Erro ao fazer upload',
                 }
               : f,
           ),
         )
-      }, 500)
-
-      setTimeout(() => {
-        clearInterval(interval)
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === newFile.id
-              ? { ...f, status: 'processing', progress: 100 }
-              : f,
-          ),
-        )
-
-        // Simulate processing completion
-        setTimeout(() => {
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === newFile.id ? { ...f, status: 'completed' } : f,
-            ),
-          )
-        }, 2000)
-      }, 5000)
-    })
+      }
+    }
 
     // Handle rejected files
     fileRejections.forEach((rejection) => {
       const newFile: FileItem = {
-        id: Date.now().toString() + Math.random(),
+        id: `rejected-${Date.now()}-${Math.random()}`,
         name: rejection.file.name,
         status: 'error',
-        error: rejection.errors[0]?.message || 'Invalid file',
+        error: rejection.errors[0]?.message || 'Arquivo inválido',
       }
       setFiles((prev) => [...prev, newFile])
     })

@@ -1,70 +1,110 @@
-import { Hono } from 'hono';
-import { ObjectId } from 'mongodb';
-import { getDatabase } from '../services/database.js';
-import type { PDFDocument } from '../types/index.js';
+import { Hono } from 'hono'
+import { eq, desc } from 'drizzle-orm'
+import { db, schema } from '../lib/db.js'
 
-const documents = new Hono();
+const documents = new Hono()
 
-// Endpoint para verificar status do documento
-documents.get('/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-
-    if (!ObjectId.isValid(id)) {
-      return c.json({ error: 'ID inválido' }, 400);
-    }
-
-    const db = getDatabase();
-    const document = await db
-      .collection<PDFDocument>('documents')
-      .findOne({ _id: new ObjectId(id) });
-
-    if (!document) {
-      return c.json({ error: 'Documento não encontrado' }, 404);
-    }
-
-    return c.json({
-      documentId: document._id?.toString(),
-      filename: document.filename,
-      status: document.status,
-      totalPages: document.totalPages,
-      error: document.error,
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
-    });
-  } catch (error) {
-    console.error('Erro ao buscar documento:', error);
-    return c.json({ error: 'Erro interno' }, 500);
-  }
-});
-
-// Listar todos os documentos (opcional, útil para o frontend)
+// GET /api/documents - List all documents
 documents.get('/', async (c) => {
-  try {
-    const db = getDatabase();
-    const documentsList = await db
-      .collection<PDFDocument>('documents')
-      .find({})
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .toArray();
+    try {
+        const allDocuments = await db
+            .select()
+            .from(schema.documents)
+            .orderBy(desc(schema.documents.createdAt))
 
-    return c.json({
-      documents: documentsList.map((doc) => ({
-        documentId: doc._id?.toString(),
-        filename: doc.filename,
-        status: doc.status,
-        totalPages: doc.totalPages,
-        error: doc.error,
-        createdAt: doc.createdAt,
-        updatedAt: doc.updatedAt,
-      })),
-    });
-  } catch (error) {
-    console.error('Erro ao listar documentos:', error);
-    return c.json({ error: 'Erro interno' }, 500);
-  }
-});
+        return c.json({ documents: allDocuments })
+    } catch (error) {
+        console.error('Error fetching documents:', error)
+        return c.json({ error: 'Failed to fetch documents' }, 500)
+    }
+})
 
-export { documents };
+// GET /api/documents/:id - Get specific document with all relations
+documents.get('/:id', async (c) => {
+    try {
+        const id = c.req.param('id')
 
+        const document = await db.query.documents.findFirst({
+            where: eq(schema.documents.id, id),
+            with: {
+                content: true,
+                analysis: true,
+                entities: true,
+                deadlines: {
+                    with: {
+                        penalties: true,
+                    },
+                },
+                timelineEvents: true,
+                reminders: true,
+            },
+        })
+
+        if (!document) {
+            return c.json({ error: 'Document not found' }, 404)
+        }
+
+        return c.json({ document })
+    } catch (error) {
+        console.error('Error fetching document:', error)
+        return c.json({ error: 'Failed to fetch document' }, 500)
+    }
+})
+
+// GET /api/documents/:id/entities - Get document entities
+documents.get('/:id/entities', async (c) => {
+    try {
+        const id = c.req.param('id')
+
+        const entities = await db
+            .select()
+            .from(schema.entities)
+            .where(eq(schema.entities.documentId, id))
+            .orderBy(desc(schema.entities.createdAt))
+
+        return c.json({ entities })
+    } catch (error) {
+        console.error('Error fetching entities:', error)
+        return c.json({ error: 'Failed to fetch entities' }, 500)
+    }
+})
+
+// GET /api/documents/:id/deadlines - Get document deadlines
+documents.get('/:id/deadlines', async (c) => {
+    try {
+        const id = c.req.param('id')
+
+        const deadlines = await db.query.deadlines.findMany({
+            where: eq(schema.deadlines.documentId, id),
+            with: {
+                penalties: true,
+            },
+            orderBy: desc(schema.deadlines.createdAt),
+        })
+
+        return c.json({ deadlines })
+    } catch (error) {
+        console.error('Error fetching deadlines:', error)
+        return c.json({ error: 'Failed to fetch deadlines' }, 500)
+    }
+})
+
+// GET /api/documents/:id/timeline - Get document timeline events
+documents.get('/:id/timeline', async (c) => {
+    try {
+        const id = c.req.param('id')
+
+        const timeline = await db
+            .select()
+            .from(schema.timelineEvents)
+            .where(eq(schema.timelineEvents.documentId, id))
+            .orderBy(desc(schema.timelineEvents.createdAt))
+
+        return c.json({ timeline })
+    } catch (error) {
+        console.error('Error fetching timeline:', error)
+        return c.json({ error: 'Failed to fetch timeline' }, 500)
+    }
+})
+
+export { documents }

@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "dotenv -e .env -- turbo dev",
     "lint": "turbo lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "migrate": "dotenv -e .env -- turbo migrate",
+    "grt": "dotenv -e .env -- turbo grt"
+
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
