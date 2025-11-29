@@ -85,7 +85,7 @@ export function normalizeDate(dateStr: string): string | null {
   // Padrão: DD/MM/YYYY ou DD-MM-YYYY ou DD.MM.YYYY
   const slashPattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/;
   const slashMatch = cleaned.match(slashPattern);
-  if (slashMatch) {
+  if (slashMatch && slashMatch[1] && slashMatch[2] && slashMatch[3]) {
     const day = slashMatch[1].padStart(2, '0');
     const month = slashMatch[2].padStart(2, '0');
     const year = slashMatch[3];
@@ -95,7 +95,7 @@ export function normalizeDate(dateStr: string): string | null {
   // Padrão: DD DE MÊS DE YYYY
   const extensoPattern = /(\d{1,2})\s+DE\s+(\w+)\s+DE\s+(\d{4})/i;
   const extensoMatch = cleaned.match(extensoPattern);
-  if (extensoMatch) {
+  if (extensoMatch && extensoMatch[1] && extensoMatch[2] && extensoMatch[3]) {
     const day = extensoMatch[1].padStart(2, '0');
     const monthName = extensoMatch[2].toUpperCase();
     const year = extensoMatch[3];
@@ -131,7 +131,7 @@ export function normalizeTime(timeStr: string): string | null {
   // Padrão: HH:MM ou HH:MMH
   const colonPattern = /(\d{1,2}):(\d{2})H?/i;
   const colonMatch = cleaned.match(colonPattern);
-  if (colonMatch) {
+  if (colonMatch && colonMatch[1] && colonMatch[2]) {
     const hours = colonMatch[1].padStart(2, '0');
     const minutes = colonMatch[2];
     return `${hours}:${minutes}`;
@@ -140,7 +140,7 @@ export function normalizeTime(timeStr: string): string | null {
   // Padrão: HHhMM ou HHH
   const hPattern = /(\d{1,2})H(\d{2})?/i;
   const hMatch = cleaned.match(hPattern);
-  if (hMatch) {
+  if (hMatch && hMatch[1]) {
     const hours = hMatch[1].padStart(2, '0');
     const minutes = hMatch[2] || '00';
     return `${hours}:${minutes}`;
@@ -149,7 +149,7 @@ export function normalizeTime(timeStr: string): string | null {
   // Padrão: HH HORAS
   const horasPattern = /(\d{1,2})\s*HORAS?/i;
   const horasMatch = cleaned.match(horasPattern);
-  if (horasMatch) {
+  if (horasMatch && horasMatch[1]) {
     const hours = horasMatch[1].padStart(2, '0');
     return `${hours}:00`;
   }
@@ -203,7 +203,7 @@ export function normalizePercentage(value: string): number | null {
   // Padrão: número seguido de %
   const percentPattern = /(\d+[,.]?\d*)\s*%/;
   const percentMatch = cleaned.match(percentPattern);
-  if (percentMatch) {
+  if (percentMatch && percentMatch[1]) {
     const numStr = percentMatch[1].replace(',', '.');
     const num = parseFloat(numStr);
     return isNaN(num) ? null : num / 100;
@@ -251,7 +251,7 @@ export function normalizeWarrantyPeriod(text: string): number | null {
   // Verificar números diretos
   const numPattern = /(\d+)\s*(MESES?|MÊS|ANOS?|DIAS?)/i;
   const numMatch = cleaned.match(numPattern);
-  if (numMatch) {
+  if (numMatch && numMatch[1] && numMatch[2]) {
     const value = parseInt(numMatch[1], 10);
     const unit = numMatch[2].toUpperCase();
     
@@ -292,7 +292,7 @@ export function normalizeDaysPeriod(text: string): { days: number; businessDays:
   // Verificar números diretos
   const numPattern = /(\d+)\s*DIAS?/i;
   const numMatch = cleaned.match(numPattern);
-  if (numMatch) {
+  if (numMatch && numMatch[1]) {
     return {
       days: parseInt(numMatch[1], 10),
       businessDays: isBusinessDays,
@@ -354,7 +354,7 @@ export function extractNumber(text: string): number | null {
   
   // Verificar números diretos
   const numMatch = cleaned.match(/(\d+)/);
-  if (numMatch) {
+  if (numMatch && numMatch[1]) {
     return parseInt(numMatch[1], 10);
   }
   

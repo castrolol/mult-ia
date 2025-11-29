@@ -70,11 +70,13 @@ export class EntityUnificationService {
 
         if (mergeResult.success) {
           // Merge bem-sucedido - adicionar referência
-          const updated = await this.addReference(
-            existing,
-            normalized.references[0]
-          );
-          result.entities.push(updated);
+          const newRef = normalized.references[0];
+          if (newRef) {
+            const updated = await this.addReference(existing, newRef);
+            result.entities.push(updated);
+          } else {
+            result.entities.push(existing);
+          }
           result.updated++;
         } else {
           // Conflito detectado - resolver por confiança
@@ -421,7 +423,10 @@ export class EntityUnificationService {
       conflict.resolution = 'REPLACED_WITH_INCOMING';
     } else {
       // Manter existente, mas adicionar referência
-      await this.addReference(existing, incoming.references[0]);
+      const incomingRef = incoming.references[0];
+      if (incomingRef) {
+        await this.addReference(existing, incomingRef);
+      }
       conflict.resolution = 'KEPT_EXISTING';
     }
 

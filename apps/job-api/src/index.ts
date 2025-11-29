@@ -7,7 +7,7 @@ import { logger } from 'hono/logger';
 import { connectDatabase } from './services/database.js';
 import { setProcessHandler } from './services/queue.js';
 import { processDocument } from './workers/pdf-processor.js';
-import { process } from './routes/process.js';
+import { process as processRoute } from './routes/process.js';
 
 const app = new Hono();
 
@@ -16,7 +16,7 @@ app.use('*', logger());
 app.use('*', cors());
 
 // Rotas
-app.route('/process', process);
+app.route('/process', processRoute);
 
 // Health check
 app.get('/health', (c) => {
