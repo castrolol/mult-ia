@@ -3,6 +3,7 @@ import { IncomingMessage } from 'http'
 import formidable from 'formidable'
 import { readFile } from 'fs/promises'
 import { createId } from '@paralleldrive/cuid2'
+import { eq } from 'drizzle-orm'
 import { db, schema } from '../lib/db.js'
 import { uploadFile } from '../services/storage.js'
 import { addJob } from '../services/queue.js'
@@ -85,9 +86,9 @@ upload.post('/', async (c) => {
     return c.json(
       {
         message: 'Documento recebido e em processamento',
-        documentId: document.id,
-        filename: document.filename,
-        status: document.status,
+        documentId: document?.id ?? documentId,
+        filename: document?.filename ?? filename,
+        status: document?.status ?? 'pending',
       },
       202
     )
@@ -103,7 +104,7 @@ upload.get('/:id', async (c) => {
     const id = c.req.param('id')
 
     const document = await db.query.documents.findFirst({
-      where: (documents, { eq }) => eq(documents.id, id),
+      where: eq(schema.documents.id, id),
     })
 
     if (!document) {

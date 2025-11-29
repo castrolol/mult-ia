@@ -5,6 +5,7 @@ import {
   jsonb,
   varchar,
   integer,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -72,7 +73,7 @@ export const entities = pgTable('entities', {
     length: 20,
     enum: ['critical', 'high', 'medium', 'low'],
   }).notNull(),
-  parentId: text('parent_id').references(() => entities.id, {
+  parentId: text('parent_id').references((): AnyPgColumn => entities.id, {
     onDelete: 'set null',
   }),
   pageNumber: integer('page_number'),
