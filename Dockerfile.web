@@ -1,83 +1,78 @@
-ARG NODE_VERSION=22.13.1
-ARG APP_DIR=apps/web    
+# ============================================
+# Dockerfile para Next.js Monorepo com Turborepo
+# Otimizado para Coolify
+# ============================================
 
-FROM node:${NODE_VERSION}-alpine AS base
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-RUN npm install -g corepack@latest \
-    && corepack enable pnpm \
-    && apk add --no-cache libc6-compat
-WORKDIR /app
+FROM node:22-alpine AS base
 
-#----------------------
-# Prepare (turbo prune)
-#----------------------
-FROM base AS prepare
-# Install turbo globally
-RUN pnpm add -g turbo@^2
-# Copy all files needed for turbo prune
-COPY . .
-# Generate pruned monorepo with isolated lockfile
-# Extract workspace name from APP_DIR (e.g., "apps/admin" -> "admin")
-ARG APP_DIR
-RUN WORKSPACE_NAME=$(basename "${APP_DIR}") && \
-    turbo prune "${WORKSPACE_NAME}" --docker
+# Instala dependências necessárias
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 
-#----------------------
-# Dependencies (pnpm workspace)
-#----------------------
+# ============================================
+# Stage 1: Instalação de dependências
+# ============================================
 FROM base AS deps
-# Install turbo globally for build stage
-RUN pnpm add -g turbo@^2
-# Copy only dependency files (package.json, lockfile, etc.)
-COPY --from=prepare /app/out/json/ .
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile
 
-#----------------------
-# Build
-#----------------------
-FROM deps AS build
-# Copy pruned source files
-COPY --from=prepare /app/out/full/ .
-
-# Optional: Remote caching support
-ENV TURBO_TEAM=analista7-3062
-ENV TURBO_TOKEN=GnzbYneGpZGLIkIJHC0jhQeG
-
-ARG APP_DIR
-ENV APP_DIR=$APP_DIR
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    WORKSPACE_NAME=$(basename "${APP_DIR}") && \
-    turbo build --filter="${WORKSPACE_NAME}"...
-
-#----------------------
-# Runtime (Next.js standalone output)
-#----------------------
-FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
 
+# Copia arquivos de configuração do monorepo
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+
+# Copia package.json de todos os workspaces
+COPY apps/web/package.json ./apps/web/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+
+# Instala dependências
+RUN pnpm install --frozen-lockfile
+
+# ============================================
+# Stage 2: Build da aplicação
+# ============================================
+FROM base AS builder
+
+WORKDIR /app
+
+# Copia node_modules do stage anterior
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/packages/ui/node_modules ./packages/ui/node_modules
+COPY --from=deps /app/packages/eslint-config/node_modules ./packages/eslint-config/node_modules
+
+# Copia todo o código fonte
+COPY . .
+
+# Build do app web usando turbo (com cache)
+RUN pnpm turbo build --filter=web
+
+# ============================================
+# Stage 3: Runner de produção
+# ============================================
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+# Define variáveis de ambiente para produção
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Cria usuário não-root para segurança
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy only the built app output
-ARG APP_DIR
-ENV APP_DIR=$APP_DIR
+# Copia arquivos estáticos e standalone build
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
-# Next.js standalone
-COPY --from=build /app/${APP_DIR}/.next/standalone ./
-COPY --from=build /app/${APP_DIR}/public ./${APP_DIR}/public
-COPY --from=build /app/${APP_DIR}/.next/static ./${APP_DIR}/.next/static
-
-# Set correct permissions
-RUN chown -R nextjs:nodejs /app
+# Usa usuário não-root
 USER nextjs
 
-# Ensure we start the server from the app directory inside standalone
-WORKDIR /app/${APP_DIR}
-
+# Expõe a porta 3000
 EXPOSE 3000
+
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
