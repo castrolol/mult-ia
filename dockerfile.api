@@ -1,0 +1,93 @@
+# syntax=docker/dockerfile:1.6
+
+ARG NODE_VERSION=22.13.1
+ARG APP_DIR=apps/api
+
+FROM node:${NODE_VERSION}-alpine AS base
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+RUN npm install -g corepack@latest \
+    && corepack enable pnpm \
+    && apk add --no-cache libc6-compat
+WORKDIR /app
+
+#----------------------
+# Prepare (turbo prune)
+#----------------------
+FROM base AS prepare
+# Install turbo globally
+RUN pnpm add -g turbo@^2
+# Copy all files needed for turbo prune
+COPY . .
+# Generate pruned monorepo with isolated lockfile
+ARG APP_DIR
+RUN WORKSPACE_NAME=$(basename "${APP_DIR}") && \
+    turbo prune "${WORKSPACE_NAME}" --docker
+
+#----------------------
+# Dependencies (pnpm workspace)
+#----------------------
+FROM base AS deps
+# Install turbo globally for build stage
+RUN pnpm add -g turbo@^2
+# Copy only dependency files (package.json, lockfile, etc.)
+COPY --from=prepare /app/out/json/ .
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+#----------------------
+# Build
+#----------------------
+FROM deps AS build
+# Copy pruned source files
+COPY --from=prepare /app/out/full/ .
+
+# Optional: Remote caching support
+ENV TURBO_TEAM=analista7-3062
+ENV TURBO_TOKEN=GnzbYneGpZGLIkIJHC0jhQeG
+
+ARG APP_DIR
+ENV APP_DIR=$APP_DIR
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    WORKSPACE_NAME=$(basename "${APP_DIR}") && \
+    turbo build --filter="${WORKSPACE_NAME}"...
+
+#----------------------
+# Production dependencies
+#----------------------
+FROM base AS prod-deps
+COPY --from=prepare /app/out/json/ .
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod
+
+#----------------------
+# Runtime (Node.js API)
+#----------------------
+FROM node:${NODE_VERSION}-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+ARG APP_DIR
+ENV APP_DIR=$APP_DIR
+
+# Copy production dependencies
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/${APP_DIR}/node_modules ./${APP_DIR}/node_modules
+COPY --from=prod-deps /app/${APP_DIR}/package.json ./${APP_DIR}/package.json
+
+# Copy built application
+COPY --from=build /app/${APP_DIR}/dist ./${APP_DIR}/dist
+
+# Set correct permissions
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+WORKDIR /app/${APP_DIR}
+
+EXPOSE 3001
+ENV PORT=3001
+CMD ["node", "dist/index.js"]
+
