@@ -5,7 +5,6 @@ import formidable from 'formidable';
 import { readFile } from 'fs/promises';
 import { getDatabase } from '../services/database.js';
 import { uploadFile } from '../services/storage.js';
-import { addJob } from '../services/queue.js';
 import type { PDFDocument } from '../types/index.js';
 
 const upload = new Hono();
@@ -37,6 +36,24 @@ async function parseFormData(
       resolve({ file: file ?? null });
     });
   });
+}
+
+// Notificar job-api para processar o documento
+async function notifyJobApi(documentId: string, s3Key: string): Promise<void> {
+  const jobApiUrl = process.env.JOB_API_URL || 'http://localhost:3001';
+
+  const response = await fetch(`${jobApiUrl}/process`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ documentId, s3Key }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Erro ao notificar job-api: ${response.status} - ${errorText}`);
+  }
 }
 
 upload.post('/', async (c) => {
@@ -81,11 +98,14 @@ upload.post('/', async (c) => {
 
     await documentsCollection.insertOne(document);
 
-    // 3. Adicionar job na fila
-    await addJob({
-      documentId: documentId.toString(),
-      s3Key,
-    });
+    // 3. Notificar job-api para processar
+    try {
+      await notifyJobApi(documentId.toString(), s3Key);
+    } catch (error) {
+      console.error('Erro ao notificar job-api:', error);
+      // Não falha a requisição, o documento foi salvo
+      // O job-api pode ter um mecanismo de retry ou polling
+    }
 
     // 4. Retornar 202 Accepted
     return c.json(
@@ -103,37 +123,5 @@ upload.post('/', async (c) => {
   }
 });
 
-// Endpoint para verificar status do documento
-upload.get('/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-
-    if (!ObjectId.isValid(id)) {
-      return c.json({ error: 'ID inválido' }, 400);
-    }
-
-    const db = getDatabase();
-    const document = await db
-      .collection<PDFDocument>('documents')
-      .findOne({ _id: new ObjectId(id) });
-
-    if (!document) {
-      return c.json({ error: 'Documento não encontrado' }, 404);
-    }
-
-    return c.json({
-      documentId: document._id?.toString(),
-      filename: document.filename,
-      status: document.status,
-      totalPages: document.totalPages,
-      error: document.error,
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
-    });
-  } catch (error) {
-    console.error('Erro ao buscar documento:', error);
-    return c.json({ error: 'Erro interno' }, 500);
-  }
-});
-
 export { upload };
+

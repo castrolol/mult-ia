@@ -5,9 +5,8 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 
 import { connectDatabase } from './services/database.js';
-import { setProcessHandler } from './services/queue.js';
-import { processDocument } from './workers/pdf-processor.js';
-import { process } from './routes/process.js';
+import { upload } from './routes/upload.js';
+import { documents } from './routes/documents.js';
 
 const app = new Hono();
 
@@ -16,7 +15,8 @@ app.use('*', logger());
 app.use('*', cors());
 
 // Rotas
-app.route('/process', process);
+app.route('/upload', upload);
+app.route('/documents', documents);
 
 // Health check
 app.get('/health', (c) => {
@@ -40,16 +40,15 @@ async function main() {
     // Conectar ao MongoDB
     await connectDatabase();
 
-    // Configurar handler da fila
-    setProcessHandler(processDocument);
-
     // Iniciar servidor
-    const port = parseInt(process.env.PORT || '3001', 10);
+    const port = parseInt(process.env.PORT || '3000', 10);
     
-    console.log(`\n🚀 Job API rodando em http://localhost:${port}`);
+    console.log(`\n🚀 API rodando em http://localhost:${port}`);
     console.log('   Endpoints:');
-    console.log('   - POST /process       → Iniciar processamento de documento');
-    console.log('   - GET  /health        → Health check\n');
+    console.log('   - POST /upload           → Upload de PDF');
+    console.log('   - GET  /documents        → Listar documentos');
+    console.log('   - GET  /documents/:id    → Status do documento');
+    console.log('   - GET  /health           → Health check\n');
 
     serve({
       fetch: app.fetch,

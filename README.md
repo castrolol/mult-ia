@@ -10,20 +10,26 @@ Sistema de processamento e análise de documentos PDF com inteligência artifici
 - **Tailwind CSS 4**
 - **shadcn/ui** com Radix UI
 
+### API (apps/api)
+- **Hono** - Framework HTTP
+- **MongoDB** - Banco de dados
+- **MinIO/S3** - Armazenamento de arquivos
+
+API principal para interação com o frontend. Gerencia uploads e consulta de documentos.
+
 ### Job Handler (apps/job-api)
 - **Hono** - Framework HTTP
 - **Vercel AI SDK** com OpenAI - para reduzir o loop boilerplate ao usar a IA
 - **MongoDB** - Banco de dados
 - **MinIO/S3** - Armazenamento de arquivos
- 
+
+Serviço de processamento em background. Processa PDFs com IA e extrai informações.
 
 ### Infraestrutura
 - **Turborepo** - Gerenciamento do monorepo
 - **pnpm** - Gerenciador de pacotes
 - **TypeScript** - Em todo o projeto
 - **Docker** - Containerização para publicação facilitada
-
- 
 
 ## Pré-requisitos
 
@@ -46,22 +52,26 @@ pnpm install
 
 ## Configuração
 
-Criar arquivo `.env` em `apps/job-api/`:
+### apps/api (.env)
 
 ```env
-# Servidor
 PORT=3001
-
-# MongoDB
 MONGODB_URI=mongodb://localhost:27017/multia
-
-# Storage (MinIO/S3)
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin
 S3_BUCKET=pdf-uploads
+```
 
-# OpenAI
+### apps/job-api (.env)
+
+```env
+PORT=3002
+MONGODB_URI=mongodb://localhost:27017/multia
+S3_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_BUCKET=pdf-uploads
 OPENAI_API_KEY=sua-chave-aqui
 ```
 
@@ -78,14 +88,26 @@ pnpm build
 pnpm lint
 ```
 
-A API estará disponível em `http://localhost:3001` e o frontend em `http://localhost:3000`.
+- **Frontend**: `http://localhost:3000`
+- **API**: `http://localhost:3001`
+- **Job API**: `http://localhost:3002`
 
-## Endpoints da API
+## Endpoints
+
+### API (apps/api)
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | POST | /upload | Upload de arquivo PDF |
-| GET | /upload/:id | Status do processamento |
+| GET | /documents | Listar documentos |
+| GET | /documents/:id | Status do documento |
+| GET | /health | Health check |
+
+### Job API (apps/job-api)
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | /process | Iniciar processamento de documento |
 | GET | /health | Health check |
 
 ## Fluxo de Processamento
