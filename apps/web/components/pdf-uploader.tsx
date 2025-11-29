@@ -4,13 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { FileText, Check, X, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
-import {
-  Header,
-  HeaderLogo,
-  HeaderNav,
-  HeaderNavLink,
-  HeaderActions,
-} from '@workspace/ui/components/header'
 import { UploadArea } from '@workspace/ui/components/upload-area'
 import {
   FileList,
@@ -145,34 +138,6 @@ export function PDFUploader() {
       <div className="flex h-full grow flex-col">
         <div className="flex flex-1 justify-center p-4 sm:p-6 md:p-8">
           <div className="flex w-full max-w-4xl flex-col gap-8">
-            <Header>
-              <HeaderLogo>
-                <div className="size-7 text-primary">
-                  <svg
-                    fill="none"
-                    viewBox="0 0 48 48"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M6 6H42L36 24L42 42H6L12 24L6 6Z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold leading-tight tracking-tight text-foreground">
-                  MultiAI PDF Uploader
-                </h2>
-              </HeaderLogo>
-              <HeaderActions>
-                <HeaderNav>
-                  <HeaderNavLink href="#">Home</HeaderNavLink>
-                  <HeaderNavLink href="#">History</HeaderNavLink>
-                  <HeaderNavLink href="#">Settings</HeaderNavLink>
-                </HeaderNav>
-                <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/60 bg-gradient-to-br from-primary/20 to-primary/40 shadow-sm" />
-              </HeaderActions>
-            </Header>
-
             <main className="flex flex-col gap-8">
               <div className="flex flex-wrap justify-between gap-3 px-4">
                 <div className="flex min-w-72 flex-col gap-3">
