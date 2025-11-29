@@ -1,6 +1,6 @@
 'use client'
 
-import { UploadFile } from 'lucide-react'
+import { FileUp } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dropzone,
@@ -27,7 +27,7 @@ export function UploadArea({ className, ...props }: UploadAreaProps) {
         <DropzoneEmptyState>
           <div className="flex flex-col items-center gap-6">
             <div className="flex size-16 items-center justify-center rounded-full bg-primary/20 text-primary">
-              <UploadFile size={32} />
+              <FileUp size={32} />
             </div>
             <div className="flex max-w-[480px] flex-col items-center gap-2">
               <p className="text-center text-lg font-bold leading-tight tracking-[-0.015em] text-foreground">
@@ -49,4 +49,3 @@ export function UploadArea({ className, ...props }: UploadAreaProps) {
     </div>
   )
 }
-
