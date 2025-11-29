@@ -32,7 +32,12 @@ export function HierarchyTreeHeader({
   children,
 }: HierarchyTreeHeaderProps) {
   return (
-    <div className={cn('mb-5 flex items-center gap-2.5 pb-3 border-b border-border/40', className)}>
+    <div
+      className={cn(
+        'mb-5 flex items-center gap-2.5 pb-3 border-b border-border/40',
+        className,
+      )}
+    >
       <FolderTree size={18} className="text-primary" />
       <span className="text-sm font-semibold text-foreground tracking-tight">
         {children}
@@ -129,21 +134,33 @@ export function HierarchyTreeItem({
         >
           {hasChildren || isExpandable ? (
             expanded ? (
-              <Minus size={14} className={isActive ? 'text-primary' : 'text-muted-foreground'} />
+              <Minus
+                size={14}
+                className={isActive ? 'text-primary' : 'text-muted-foreground'}
+              />
             ) : (
-              <Plus size={14} className={isActive ? 'text-primary' : 'text-muted-foreground'} />
+              <Plus
+                size={14}
+                className={isActive ? 'text-primary' : 'text-muted-foreground'}
+              />
             )
           ) : (
             <ChevronRight size={14} className="opacity-40" />
           )}
         </span>
-        <span className={cn(
-          'truncate text-sm font-medium transition-colors duration-200',
-          isActive ? 'text-primary' : 'text-foreground'
-        )}>{label}</span>
+        <span
+          className={cn(
+            'truncate text-sm font-medium transition-colors duration-200',
+            isActive ? 'text-primary' : 'text-foreground',
+          )}
+        >
+          {label}
+        </span>
       </div>
       {hasChildren && expanded && (
-        <ul className="pl-6 mt-1.5 space-y-1 border-l border-border/30 ml-2">{children}</ul>
+        <ul className="pl-6 mt-1.5 space-y-1 border-l border-border/30 ml-2">
+          {children}
+        </ul>
       )}
     </li>
   )

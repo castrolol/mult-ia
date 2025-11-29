@@ -168,149 +168,151 @@ export function DocumentViewer({
   }
 
   return (
-    <div className="flex h-screen w-full p-5 gap-5 bg-background/95">
-      {/* Sidebar */}
-      <aside className="flex flex-col w-full max-w-sm shrink-0 gap-5">
-        {/* Back button */}
-        <Link href="/">
-          <Button variant="ghost" className="w-fit gap-2 hover:bg-muted/50 transition-all duration-200">
-            <ArrowLeft size={16} />
-            Voltar
-          </Button>
-        </Link>
-
-        {/* Hierarchy */}
-        <HierarchyTree className="h-1/2">
-          <HierarchyTreeHeader>Hierarquia</HierarchyTreeHeader>
-          <HierarchyTreeContent>
-            <HierarchyTreeItem
-              id="prazo-x"
-              label="Prazo X"
-              defaultExpanded
-              content={hierarchyData.prazoX.content}
-              notes={hierarchyData.prazoX.notes}
-              breadcrumb={hierarchyData.prazoX.breadcrumb}
-              isActive={selectedItem?.id === 'prazo-x'}
-              onSelect={handleHierarchySelect}
+    <div className="flex flex-col gap-5">
+      <div className="px-5 pt-2">
+        <DetailPanel>
+          <Link href="/">
+            <Button
+              variant="ghost"
+              className="w-fit gap-2 hover:bg-muted/50 transition-all duration-200"
             >
+              <ArrowLeft size={16} />
+              Voltar
+            </Button>
+          </Link>
+        </DetailPanel>
+      </div>
+      <div className="flex h-screen w-full px-5 py-2 gap-5 bg-background/95">
+        <aside className="flex flex-col w-full max-w-sm shrink-0 gap-5 sticky top-0">
+          {/* Hierarchy */}
+          <HierarchyTree className="h-1/2">
+            <HierarchyTreeHeader>Hierarquia</HierarchyTreeHeader>
+            <HierarchyTreeContent>
               <HierarchyTreeItem
-                id="prazo-x-regras"
-                label="Regras"
-                content={hierarchyData.regras.content}
-                breadcrumb={[documentName, 'Prazo X', 'Regras']}
-                isActive={selectedItem?.id === 'prazo-x-regras'}
-                onSelect={handleHierarchySelect}
-              />
-            </HierarchyTreeItem>
-            <HierarchyTreeItem
-              id="prazo-y"
-              label="Prazo Y"
-              defaultExpanded
-              content="O Prazo Y estabelece o período para a segunda fase do processo."
-              breadcrumb={[documentName, 'Prazo Y']}
-              isActive={selectedItem?.id === 'prazo-y'}
-              onSelect={handleHierarchySelect}
-            >
-              <HierarchyTreeItem
-                id="regras"
-                label="Regras"
+                id="prazo-x"
+                label="Prazo X"
                 defaultExpanded
-                content={hierarchyData.regras.content}
-                notes={hierarchyData.regras.notes}
-                breadcrumb={hierarchyData.regras.breadcrumb}
-                isActive={selectedItem?.id === 'regras'}
+                content={hierarchyData.prazoX.content}
+                notes={hierarchyData.prazoX.notes}
+                breadcrumb={hierarchyData.prazoX.breadcrumb}
+                isActive={selectedItem?.id === 'prazo-x'}
                 onSelect={handleHierarchySelect}
               >
                 <HierarchyTreeItem
-                  id="multa-x"
-                  label="Multa X"
-                  content={hierarchyData.multaX.content}
-                  notes={hierarchyData.multaX.notes}
-                  breadcrumb={hierarchyData.multaX.breadcrumb}
-                  isActive={selectedItem?.id === 'multa-x'}
+                  id="prazo-x-regras"
+                  label="Regras"
+                  content={hierarchyData.regras.content}
+                  breadcrumb={[documentName, 'Prazo X', 'Regras']}
+                  isActive={selectedItem?.id === 'prazo-x-regras'}
                   onSelect={handleHierarchySelect}
                 />
               </HierarchyTreeItem>
-            </HierarchyTreeItem>
-          </HierarchyTreeContent>
-        </HierarchyTree>
-
-        {/* Timeline */}
-        <Timeline className="h-1/2">
-          <TimelineHeader>Timeline</TimelineHeader>
-          <TimelineContent>
-            <TimelineItem
-              id="doc-enviado"
-              title="Documento Enviado"
-              description="Upload do documento realizado com sucesso."
-              date="29/11/2025"
-              time="14:30"
-              content={timelineData.enviado.content}
-              breadcrumb={timelineData.enviado.breadcrumb}
-              isActive={selectedItem?.id === 'doc-enviado'}
-              onSelect={handleTimelineSelect}
-            />
-            <TimelineItem
-              id="processamento"
-              title="Processamento"
-              description="Documento em análise pelo sistema."
-              date="29/11/2025"
-              time="14:32"
-              content={timelineData.processamento.content}
-              breadcrumb={timelineData.processamento.breadcrumb}
-              isActive={selectedItem?.id === 'processamento'}
-              onSelect={handleTimelineSelect}
-            />
-            <TimelineItem
-              id="analise-concluida"
-              title="Análise Concluída"
-              description="Extração de dados finalizada."
-              date="29/11/2025"
-              time="14:35"
-              content={timelineData.analise.content}
-              notes={timelineData.analise.notes}
-              breadcrumb={timelineData.analise.breadcrumb}
-              isActive={selectedItem?.id === 'analise-concluida'}
-              onSelect={handleTimelineSelect}
-            />
-          </TimelineContent>
-        </Timeline>
-      </aside>
-
-      {/* Main Content - Detail Panel */}
-      <DetailPanel>
-        {selectedItem ? (
-          <>
-            <DetailPanelHeader
-              title={selectedItem.title}
-              breadcrumb={selectedItem.breadcrumb}
-            />
-            <DetailPanelContent>
-              <p>
-                {selectedItem.content ||
-                  'Sem conteúdo disponível para este item.'}
-              </p>
-            </DetailPanelContent>
-
-            {/* Notes/Comments */}
-            {getItemNotes(selectedItem.id, selectedItem.notes).map(
-              (note, index) => (
-                <DetailPanelNote
-                  key={`${selectedItem.id}-note-${index}`}
-                  author={note.author}
-                  date={note.date}
+              <HierarchyTreeItem
+                id="prazo-y"
+                label="Prazo Y"
+                defaultExpanded
+                content="O Prazo Y estabelece o período para a segunda fase do processo."
+                breadcrumb={[documentName, 'Prazo Y']}
+                isActive={selectedItem?.id === 'prazo-y'}
+                onSelect={handleHierarchySelect}
+              >
+                <HierarchyTreeItem
+                  id="regras"
+                  label="Regras"
+                  defaultExpanded
+                  content={hierarchyData.regras.content}
+                  notes={hierarchyData.regras.notes}
+                  breadcrumb={hierarchyData.regras.breadcrumb}
+                  isActive={selectedItem?.id === 'regras'}
+                  onSelect={handleHierarchySelect}
                 >
-                  {note.text}
-                </DetailPanelNote>
-              ),
-            )}
+                  <HierarchyTreeItem
+                    id="multa-x"
+                    label="Multa X"
+                    content={hierarchyData.multaX.content}
+                    notes={hierarchyData.multaX.notes}
+                    breadcrumb={hierarchyData.multaX.breadcrumb}
+                    isActive={selectedItem?.id === 'multa-x'}
+                    onSelect={handleHierarchySelect}
+                  />
+                </HierarchyTreeItem>
+              </HierarchyTreeItem>
+            </HierarchyTreeContent>
+          </HierarchyTree>
 
-            <DetailPanelCommentInput onSubmit={handleAddComment} />
-          </>
-        ) : (
-          <DetailPanelEmptyState />
-        )}
-      </DetailPanel>
+          {/* Timeline */}
+          <Timeline className="h-1/2">
+            <TimelineHeader>Timeline</TimelineHeader>
+            <TimelineContent>
+              <TimelineItem
+                id="doc-enviado"
+                title="Documento Enviado"
+                description="Upload do documento realizado com sucesso."
+                date="29/11/2025"
+                time="14:30"
+                content={timelineData.enviado.content}
+                breadcrumb={timelineData.enviado.breadcrumb}
+                isActive={selectedItem?.id === 'doc-enviado'}
+                onSelect={handleTimelineSelect}
+              />
+              <TimelineItem
+                id="processamento"
+                title="Processamento"
+                description="Documento em análise pelo sistema."
+                date="29/11/2025"
+                time="14:32"
+                content={timelineData.processamento.content}
+                breadcrumb={timelineData.processamento.breadcrumb}
+                isActive={selectedItem?.id === 'processamento'}
+                onSelect={handleTimelineSelect}
+              />
+              <TimelineItem
+                id="analise-concluida"
+                title="Análise Concluída"
+                description="Extração de dados finalizada."
+                date="29/11/2025"
+                time="14:35"
+                content={timelineData.analise.content}
+                notes={timelineData.analise.notes}
+                breadcrumb={timelineData.analise.breadcrumb}
+                isActive={selectedItem?.id === 'analise-concluida'}
+                onSelect={handleTimelineSelect}
+              />
+            </TimelineContent>
+          </Timeline>
+        </aside>
+
+        {/* Main Content - Detail Panel */}
+        <DetailPanel>
+          {selectedItem ? (
+            <>
+              <DetailPanelContent>
+                <p>
+                  {selectedItem.content ||
+                    'Sem conteúdo disponível para este item.'}
+                </p>
+              </DetailPanelContent>
+
+              {/* Notes/Comments */}
+              {getItemNotes(selectedItem.id, selectedItem.notes).map(
+                (note, index) => (
+                  <DetailPanelNote
+                    key={`${selectedItem.id}-note-${index}`}
+                    author={note.author}
+                    date={note.date}
+                  >
+                    {note.text}
+                  </DetailPanelNote>
+                ),
+              )}
+
+              <DetailPanelCommentInput onSubmit={handleAddComment} />
+            </>
+          ) : (
+            <DetailPanelEmptyState />
+          )}
+        </DetailPanel>
+      </div>
     </div>
   )
 }
