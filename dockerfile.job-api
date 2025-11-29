@@ -8,7 +8,8 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN npm install -g corepack@latest \
     && corepack enable pnpm \
-    && apk add --no-cache libc6-compat
+    && apk add --no-cache libc6-compat ca-certificates \
+    && update-ca-certificates
 WORKDIR /app
 
 #----------------------
@@ -66,6 +67,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+
+# Instalar certificados CA para conexões SSL/TLS
+RUN apk add --no-cache ca-certificates && update-ca-certificates
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs

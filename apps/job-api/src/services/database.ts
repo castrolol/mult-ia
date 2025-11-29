@@ -8,7 +8,13 @@ export async function connectDatabase(): Promise<Db> {
 
   const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/multia';
   
-  client = new MongoClient(uri);
+  client = new MongoClient(uri, {
+    // Opções TLS para compatibilidade com MongoDB Atlas em containers
+    tls: uri.includes('mongodb+srv') || uri.includes('mongodb.net'),
+    tlsAllowInvalidCertificates: false,
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+  });
   await client.connect();
   
   db = client.db();
