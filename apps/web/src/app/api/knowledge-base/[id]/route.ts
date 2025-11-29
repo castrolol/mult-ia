@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { knowledgeBaseStorage } from '@/lib/storage'
+import { knowledgeBaseStorage } from '@workspace/drizzle/storage'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -9,12 +9,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
 
-    const item = knowledgeBaseStorage.get(id)
+    const item = await knowledgeBaseStorage.get(id)
 
     if (!item) {
       return NextResponse.json(
         { success: false, error: 'Item não encontrado' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error('Get knowledge base item error:', error)
     return NextResponse.json(
       { success: false, error: 'Erro ao buscar item' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
@@ -36,12 +36,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { id } = await params
     const body = await request.json()
 
-    const item = knowledgeBaseStorage.get(id)
+    const item = await knowledgeBaseStorage.get(id)
 
     if (!item) {
       return NextResponse.json(
         { success: false, error: 'Item não encontrado' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 
@@ -51,7 +51,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.applyMode !== undefined) updates.applyMode = body.applyMode
     if (body.category !== undefined) updates.category = body.category
 
-    const updated = knowledgeBaseStorage.update(id, updates)
+    const updated = await knowledgeBaseStorage.update(id, updates)
+
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, error: 'Erro ao atualizar item' },
+        { status: 500 },
+      )
+    }
 
     return NextResponse.json({
       success: true,
@@ -62,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     console.error('Update knowledge base item error:', error)
     return NextResponse.json(
       { success: false, error: 'Erro ao atualizar item' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
@@ -71,16 +78,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
 
-    const item = knowledgeBaseStorage.get(id)
+    const item = await knowledgeBaseStorage.get(id)
 
     if (!item) {
       return NextResponse.json(
         { success: false, error: 'Item não encontrado' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 
-    knowledgeBaseStorage.delete(id)
+    await knowledgeBaseStorage.delete(id)
 
     return NextResponse.json({
       success: true,
@@ -90,7 +97,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     console.error('Delete knowledge base item error:', error)
     return NextResponse.json(
       { success: false, error: 'Erro ao excluir item' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
