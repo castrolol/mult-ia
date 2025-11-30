@@ -44,11 +44,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
   
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-    throw new JobApiError(response.status, error.error || 'Erro na Job API');
+    const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' })) as { error?: string };
+    throw new JobApiError(response.status, errorData.error || 'Erro na Job API');
   }
   
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 /**
