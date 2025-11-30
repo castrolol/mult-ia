@@ -275,9 +275,9 @@ export function usePrefetchPositions(
         const entity = entities[i]
         
         // Verifica se já está no cache
-        const cached = await positionCache.get(documentId, entity.id)
+        const cached = await positionCache.get(documentId, entity?.id || '')
         
-        if (!cached && entity.sourceText && entity.sourceText.trim().length >= 3) {
+        if (!cached && entity?.sourceText && entity?.sourceText.trim().length >= 3) {
           try {
             const findTextPosition = await getFindTextPosition()
             if (!findTextPosition) continue

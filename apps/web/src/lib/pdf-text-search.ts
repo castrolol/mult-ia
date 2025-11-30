@@ -154,7 +154,7 @@ export async function findTextPosition(
       const y = item.transform[5]
 
       // Se mudou de linha, processa a linha anterior
-      if (lastY !== -1 && Math.abs(y - lastY) > 5) {
+      if (lastY !== -1 && Math.abs((y || 0) - lastY) > 5) {
         const matchResult = findMatchInLine(
           currentLine,
           lineItems,
@@ -174,7 +174,7 @@ export async function findTextPosition(
 
       currentLine += item.str + ' '
       lineItems.push(item)
-      lastY = y
+      lastY = y || 0
     }
 
     // Processa última linha
@@ -273,10 +273,10 @@ function createPositionsFromItems(
     const itemWidth = item.width || 0
     const itemHeight = item.height || 10
 
-    minX = Math.min(minX, x)
-    minY = Math.min(minY, y - itemHeight)
-    maxX = Math.max(maxX, x + itemWidth)
-    maxY = Math.max(maxY, y)
+    minX = Math.min(minX, x || Number.MAX_VALUE)
+    minY = Math.min(minY, (y || Number.MAX_VALUE) - itemHeight)
+    maxX = Math.max(maxX, (x || Number.MIN_VALUE) + itemWidth)
+    maxY = Math.max(maxY, y || Number.MIN_VALUE)
   }
 
   // Converte para porcentagem
