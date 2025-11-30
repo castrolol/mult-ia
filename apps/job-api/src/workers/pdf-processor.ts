@@ -8,6 +8,7 @@ import { getDocumentStructureService } from '../services/document-structure.js';
 import { getTimelineService } from '../services/timeline.js';
 import { getRiskService } from '../services/risk.js';
 import { getEntityUnificationService } from '../services/entity-unification.js';
+import { getRagService } from '../services/rag.js';
 import { analyzeDocumentWithBatches } from '../ai/agent.js';
 import type { PDFDocument, ProcessJobData, DocumentConfig } from '../types/index.js';
 import { DEFAULT_PROCESSING_CONFIG } from '../types/entities.js';
@@ -210,6 +211,21 @@ export async function processDocument(data: ProcessJobData): Promise<void> {
       currentBatch: batches.length,
     });
     
+    // 7. Gerar embeddings para RAG (se processamento foi bem-sucedido)
+    let embeddingsCreated = 0;
+    if (analysisResult.success) {
+      console.log(`\n🔢 Gerando embeddings para RAG...`);
+      try {
+        const ragService = getRagService();
+        const embeddingResult = await ragService.prepareDocument(documentId);
+        embeddingsCreated = embeddingResult.created;
+        console.log(`   ✓ ${embeddingsCreated} embeddings criados`);
+      } catch (embeddingError) {
+        console.error(`   ⚠️  Erro ao gerar embeddings (não crítico):`, embeddingError);
+        // Não falha o processamento por erro de embedding
+      }
+    }
+    
     // Log final
     console.log(`\n${'='.repeat(60)}`);
     console.log(`✅ PROCESSAMENTO CONCLUÍDO`);
@@ -221,6 +237,7 @@ export async function processDocument(data: ProcessJobData): Promise<void> {
     console.log(`   Entidades: ${analysisResult.totalEntities}`);
     console.log(`   Timeline: ${analysisResult.totalTimelineEvents} eventos`);
     console.log(`   Riscos: ${analysisResult.totalRisks}`);
+    console.log(`   Embeddings RAG: ${embeddingsCreated}`);
     console.log(`   Tempo total: ${(analysisResult.totalProcessingTimeMs / 1000).toFixed(2)}s`);
     
     if (!analysisResult.success) {

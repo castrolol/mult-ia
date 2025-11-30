@@ -298,6 +298,57 @@ export interface CommentsResponse {
 }
 
 // ============================================================================
+// CHAT RAG
+// ============================================================================
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sourcePagesUsed?: number[]
+  createdAt: string
+}
+
+export interface Conversation {
+  id: string
+  title: string
+  messageCount: number
+  createdAt: string
+  lastMessageAt: string
+}
+
+export interface ChatResponse {
+  messageId: string
+  conversationId: string
+  content: string
+  sourcePagesUsed: number[]
+  sourceSnippets?: Array<{
+    pageNumber: number
+    excerpt: string
+    similarity: number
+  }>
+}
+
+export interface RagStatus {
+  documentId: string
+  isReady: boolean
+  totalPages: number
+  embeddedPages: number
+  lastUpdated?: string
+}
+
+export interface ConversationsListResponse {
+  documentId: string
+  conversations: Conversation[]
+  total: number
+}
+
+export interface ConversationDetailResponse {
+  conversation: Conversation
+  messages: ChatMessage[]
+}
+
+// ============================================================================
 // API CLIENT
 // ============================================================================
 
@@ -595,6 +646,86 @@ class APIClient {
 
   async getRisk(documentId: string, riskId: string): Promise<Risk> {
     return this.request(`/risks/${documentId}/${riskId}`)
+  }
+
+  // ============================================================================
+  // CHAT RAG
+  // ============================================================================
+
+  async sendChatMessage(
+    documentId: string,
+    message: string,
+    conversationId?: string,
+    topK?: number,
+  ): Promise<ChatResponse> {
+    return this.request(`/chat/${documentId}`, {
+      method: 'POST',
+      body: JSON.stringify({ message, conversationId, topK }),
+    })
+  }
+
+  async listConversations(documentId: string): Promise<ConversationsListResponse> {
+    return this.request<ConversationsListResponse>(`/chat/${documentId}`)
+  }
+
+  async createConversation(
+    documentId: string,
+    title?: string,
+  ): Promise<{ id: string; title: string; createdAt: string }> {
+    return this.request(`/chat/${documentId}/new`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    })
+  }
+
+  async getConversation(
+    documentId: string,
+    conversationId: string,
+  ): Promise<ConversationDetailResponse> {
+    return this.request<ConversationDetailResponse>(
+      `/chat/${documentId}/${conversationId}`,
+    )
+  }
+
+  async updateConversationTitle(
+    documentId: string,
+    conversationId: string,
+    title: string,
+  ): Promise<{ success: boolean; title: string }> {
+    return this.request(`/chat/${documentId}/${conversationId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title }),
+    })
+  }
+
+  async deleteConversation(
+    documentId: string,
+    conversationId: string,
+  ): Promise<{ success: boolean; messagesDeleted: number }> {
+    return this.request(`/chat/${documentId}/${conversationId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async getRagStatus(documentId: string): Promise<RagStatus> {
+    return this.request<RagStatus>(`/chat/${documentId}/rag/status`)
+  }
+
+  async prepareRag(
+    documentId: string,
+    regenerate?: boolean,
+  ): Promise<{
+    success: boolean
+    action: string
+    created: number
+    skipped?: number
+    deleted?: number
+    error?: string
+  }> {
+    return this.request(`/chat/${documentId}/rag/prepare`, {
+      method: 'POST',
+      body: JSON.stringify({ regenerate }),
+    })
   }
 }
 

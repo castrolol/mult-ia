@@ -15,6 +15,7 @@ import { timeline } from './routes/timeline.js';
 import { structure } from './routes/structure.js';
 import { risks } from './routes/risks.js';
 import { swagger } from './routes/swagger.js';
+import { chat } from './routes/chat.js';
 
 const app = new Hono();
 
@@ -40,6 +41,9 @@ app.route('/structure', structure);
 
 // Riscos
 app.route('/risks', risks);
+
+// Chat RAG
+app.route('/chat', chat);
 
 // Swagger
 app.route('/swagger', swagger);
@@ -87,6 +91,14 @@ async function main() {
     console.log('   - GET  /structure/:id        → Estrutura hierárquica');
     console.log('   - GET  /risks/:id            → Riscos identificados');
     console.log('   - GET  /health               → Health check');
+    console.log('');
+    console.log('💬 Chat RAG:');
+    console.log('   - POST /chat/:documentId     → Enviar mensagem');
+    console.log('   - GET  /chat/:documentId     → Listar conversas');
+    console.log('   - GET  /chat/:documentId/:id → Histórico conversa');
+    console.log('   - POST /chat/:documentId/new → Nova conversa');
+    console.log('   - POST /chat/:documentId/rag/prepare → Preparar RAG');
+    console.log('   - GET  /chat/:documentId/rag/status  → Status RAG');
     console.log('');
 
     serve({

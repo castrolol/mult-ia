@@ -53,3 +53,15 @@ export {
   type EntityPositionData,
   type UseTextPositionResult,
 } from './use-text-position'
+
+// Hooks de chat RAG
+export {
+  useRagStatus,
+  usePrepareRag,
+  useConversations,
+  useConversation,
+  useCreateConversation,
+  useSendMessage,
+  useUpdateConversationTitle,
+  useDeleteConversation,
+} from './use-chat'

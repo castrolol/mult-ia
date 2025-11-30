@@ -410,7 +410,7 @@ export function PDFUploader() {
 
         {/* Footer */}
         <div className="mt-8 flex items-center justify-center gap-8 text-muted-foreground text-sm font-medium">
-          <span>© 2024 Mult.IA</span>
+          <span>© 2025 Mult.IA</span>
           <span className="w-1 h-1 bg-border rounded-full" />
           <a href="#" className="hover:text-primary transition-colors">
             Privacidade

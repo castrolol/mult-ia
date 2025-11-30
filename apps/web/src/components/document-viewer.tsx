@@ -611,7 +611,13 @@ export function DocumentViewer({
 
             {viewMode === 'chat' && (
               <div className="h-full min-h-[400px]">
-                <ChatPanel documentName={documentName} />
+                {documentId ? (
+                  <ChatPanel documentId={documentId} documentName={documentName} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>Selecione um documento para usar o chat.</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

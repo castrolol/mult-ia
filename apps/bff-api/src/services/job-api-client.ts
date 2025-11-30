@@ -247,6 +247,124 @@ export const risksApi = {
 };
 
 // ============================================================================
+// CHAT RAG
+// ============================================================================
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sourcePagesUsed?: number[];
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  messageCount: number;
+  createdAt: string;
+  lastMessageAt: string;
+}
+
+export interface ChatResponse {
+  messageId: string;
+  conversationId: string;
+  content: string;
+  sourcePagesUsed: number[];
+  sourceSnippets?: Array<{
+    pageNumber: number;
+    excerpt: string;
+    similarity: number;
+  }>;
+}
+
+export interface RagStatus {
+  documentId: string;
+  isReady: boolean;
+  totalPages: number;
+  embeddedPages: number;
+  lastUpdated?: string;
+}
+
+export const chatApi = {
+  /**
+   * Envia mensagem e recebe resposta do assistente
+   */
+  sendMessage: (documentId: string, message: string, conversationId?: string, topK?: number) =>
+    request<ChatResponse>(`/chat/${documentId}`, {
+      method: 'POST',
+      body: { message, conversationId, topK },
+    }),
+
+  /**
+   * Lista conversas de um documento
+   */
+  listConversations: (documentId: string) =>
+    request<{
+      documentId: string;
+      conversations: Conversation[];
+      total: number;
+    }>(`/chat/${documentId}`),
+
+  /**
+   * Cria uma nova conversa
+   */
+  createConversation: (documentId: string, title?: string) =>
+    request<{ id: string; title: string; createdAt: string }>(`/chat/${documentId}/new`, {
+      method: 'POST',
+      body: { title },
+    }),
+
+  /**
+   * Busca histórico de uma conversa
+   */
+  getConversation: (documentId: string, conversationId: string) =>
+    request<{
+      conversation: Conversation;
+      messages: ChatMessage[];
+    }>(`/chat/${documentId}/${conversationId}`),
+
+  /**
+   * Atualiza título de uma conversa
+   */
+  updateConversationTitle: (documentId: string, conversationId: string, title: string) =>
+    request<{ success: boolean; title: string }>(`/chat/${documentId}/${conversationId}`, {
+      method: 'PUT',
+      body: { title },
+    }),
+
+  /**
+   * Deleta uma conversa
+   */
+  deleteConversation: (documentId: string, conversationId: string) =>
+    request<{ success: boolean; messagesDeleted: number }>(`/chat/${documentId}/${conversationId}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Prepara RAG (gera embeddings)
+   */
+  prepareRag: (documentId: string, regenerate?: boolean) =>
+    request<{
+      success: boolean;
+      action: string;
+      created: number;
+      skipped?: number;
+      deleted?: number;
+      error?: string;
+    }>(`/chat/${documentId}/rag/prepare`, {
+      method: 'POST',
+      body: { regenerate },
+    }),
+
+  /**
+   * Verifica status do RAG
+   */
+  getRagStatus: (documentId: string) =>
+    request<RagStatus>(`/chat/${documentId}/rag/status`),
+};
+
+// ============================================================================
 // HEALTH
 // ============================================================================
 
