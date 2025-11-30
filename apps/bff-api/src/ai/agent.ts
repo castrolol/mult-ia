@@ -42,7 +42,7 @@ Após sua análise, use a tool "savePageAnalysis" para salvar os resultados.`,
     });
 
     const toolCallsCount = steps.reduce(
-      (acc, step) => acc + (step.toolCalls?.length || 0),
+      (acc: number, step: { toolCalls?: unknown[] }) => acc + (step.toolCalls?.length || 0),
       0
     );
 

@@ -22,7 +22,7 @@ export function createTools(documentId: string, pageNumber: number) {
             'Id, Nome ou parte do nome da entidade a ser buscada (ex: "clausula", "prazo", "risco",  "contrato", se for menor q 3 caracteres, sera buscado somente por id... caso contrario, por todos os campos citados)',
           ),
       }),
-      execute: async ({ entity }) => {
+      execute: async ({ entity }: { entity: string }) => {
         try {
           const entities = await db.collection<Entity[]>('entities').find(
             entity.length < 3
@@ -61,9 +61,9 @@ export function createTools(documentId: string, pageNumber: number) {
           }),
         ),
       }),
-      execute: async ({ entities }) => {
+      execute: async ({ entities }: { entities: Array<{ id: string; name: string; description: string; value: string; type: string; parentId: string }> }) => {
         try {
-          const bulkCommands = entities.map((entity) => ({
+          const bulkCommands = entities.map((entity: { id: string; name: string; description: string; value: string; type: string; parentId: string }) => ({
             updateOne: {
               filter: { id: entity.id }, // Query to find the document
               update: {
