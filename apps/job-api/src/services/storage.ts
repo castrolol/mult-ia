@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl as s3GetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 
 let s3Client: S3Client | null = null;
@@ -71,5 +72,26 @@ export async function downloadFile(key: string): Promise<Buffer> {
   }
 
   return Buffer.concat(chunks);
+}
+
+/**
+ * Gera uma URL assinada para acesso temporário ao arquivo
+ * @param key - Chave do arquivo no S3
+ * @param expiresIn - Tempo de expiração em segundos (default: 1 hora)
+ */
+export async function getSignedUrl(
+  key: string,
+  expiresIn: number = 3600
+): Promise<string> {
+  const client = getS3Client();
+
+  const command = new GetObjectCommand({
+    Bucket: getBucket(),
+    Key: key,
+  });
+
+  const signedUrl = await s3GetSignedUrl(client, command, { expiresIn });
+  
+  return signedUrl;
 }
 

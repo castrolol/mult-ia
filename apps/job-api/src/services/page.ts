@@ -10,6 +10,14 @@ function generatePageId(): string {
 }
 
 /**
+ * Conta palavras em um texto
+ */
+function countWords(text: string): number {
+  if (!text || !text.trim()) return 0;
+  return text.trim().split(/\s+/).length;
+}
+
+/**
  * Serviço para gerenciar a collection de páginas de documentos
  * Responsável por rastrear o processamento de cada página
  */
@@ -32,6 +40,7 @@ export class PageService {
       documentId,
       pageNumber: page.pageNumber,
       text: page.text,
+      wordCount: countWords(page.text),
       status: 'pending' as PageStatus,
       entitiesExtracted: 0,
       createdAt: now,
@@ -115,6 +124,16 @@ export class PageService {
       processingTimeMs,
       error,
     });
+  }
+
+  /**
+   * Atualiza o número do batch que processou a página
+   */
+  async updateBatchNumber(pageId: string, batchNumber: number): Promise<void> {
+    await this.collection.updateOne(
+      { id: pageId },
+      { $set: { batchNumber } }
+    );
   }
 
   /**

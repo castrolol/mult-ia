@@ -2,9 +2,15 @@ import { ObjectId } from 'mongodb';
 import pdfParse from 'pdf-parse';
 import { getDatabase } from '../services/database.js';
 import { downloadFile } from '../services/storage.js';
-import { analyzeDocumentWithAI } from '../ai/agent.js';
+import { getBatchProcessorService } from '../services/batch-processor.js';
+import { getPageService } from '../services/page.js';
+import { getDocumentStructureService } from '../services/document-structure.js';
+import { getTimelineService } from '../services/timeline.js';
+import { getRiskService } from '../services/risk.js';
 import { getEntityUnificationService } from '../services/entity-unification.js';
-import type { PDFDocument, ProcessJobData } from '../types/index.js';
+import { analyzeDocumentWithBatches } from '../ai/agent.js';
+import type { PDFDocument, ProcessJobData, DocumentConfig } from '../types/index.js';
+import { DEFAULT_PROCESSING_CONFIG } from '../types/entities.js';
 
 interface PageContent {
   pageNumber: number;
@@ -17,19 +23,15 @@ interface PageContent {
 async function extractPagesFromPDF(buffer: Buffer): Promise<PageContent[]> {
   const data = await pdfParse(buffer);
   
-  // pdf-parse retorna o texto completo, mas podemos dividir por páginas
-  // usando o número de páginas e tentando dividir o texto
   const totalPages = data.numpages;
   const fullText = data.text;
   
-  // Estratégia simples: dividir o texto proporcionalmente
-  // Em produção, usar pdfjs-dist para extração página por página mais precisa
   const pages: PageContent[] = [];
   
   if (totalPages === 1) {
     pages.push({ pageNumber: 1, text: fullText });
   } else {
-    // Tenta dividir por marcadores de página comuns ou proporcionalmente
+    // Estratégia: dividir por marcadores de página ou proporcionalmente
     const lines = fullText.split('\n');
     const linesPerPage = Math.ceil(lines.length / totalPages);
     
@@ -73,75 +75,260 @@ async function updateDocumentStatus(
 }
 
 /**
+ * Limpa dados anteriores do documento (para reprocessamento)
+ */
+async function clearPreviousData(documentId: string): Promise<{
+  entities: number;
+  pages: number;
+  sections: number;
+  timeline: number;
+  risks: number;
+}> {
+  const pageService = getPageService();
+  const structureService = getDocumentStructureService();
+  const timelineService = getTimelineService();
+  const riskService = getRiskService();
+  const unificationService = getEntityUnificationService();
+
+  const [entities, pages, sections, timeline, risks] = await Promise.all([
+    unificationService.clearDocumentEntities(documentId),
+    pageService.clearDocumentPages(documentId),
+    structureService.clearDocumentSections(documentId),
+    timelineService.clearDocumentEvents(documentId),
+    riskService.clearDocumentRisks(documentId),
+  ]);
+
+  return { entities, pages, sections, timeline, risks };
+}
+
+/**
  * Processa um documento PDF (edital de licitação)
- * - Baixa do Minio
- * - Extrai texto por página
- * - Analisa com IA para extrair entidades
- * - Unifica e deduplica entidades
+ * 
+ * Fluxo:
+ * 1. Baixa do Minio
+ * 2. Extrai texto por página
+ * 3. Divide em batches baseado no wordCap
+ * 4. Processa cada batch em dois estágios:
+ *    - Estágio 1: Estrutura hierárquica
+ *    - Estágio 2: Entidades, timeline, riscos
+ * 5. Pós-processamento: Consolidação
  */
 export async function processDocument(data: ProcessJobData): Promise<void> {
-  const { documentId, s3Key } = data;
-  const unificationService = getEntityUnificationService();
+  const { documentId, s3Key, config: customConfig } = data;
   
-  console.log(`\n📄 Processando edital: ${documentId}`);
+  // Merge config com defaults
+  const config: DocumentConfig = {
+    wordCap: customConfig?.wordCap ?? DEFAULT_PROCESSING_CONFIG.wordCap,
+    maxPagesPerBatch: customConfig?.maxPagesPerBatch ?? DEFAULT_PROCESSING_CONFIG.maxPagesPerBatch,
+  };
+
+  const batchService = getBatchProcessorService();
+  const pageService = getPageService();
+  
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📄 PROCESSANDO EDITAL: ${documentId}`);
+  console.log(`${'='.repeat(60)}`);
   console.log(`   S3 Key: ${s3Key}`);
+  console.log(`   Config: wordCap=${config.wordCap}, maxPagesPerBatch=${config.maxPagesPerBatch}`);
   
   try {
     // Atualizar status para PROCESSING
-    await updateDocumentStatus(documentId, 'PROCESSING');
+    await updateDocumentStatus(documentId, 'PROCESSING', {
+      processingStartedAt: new Date(),
+      config,
+    });
     
-    // Limpar entidades anteriores deste documento (reprocessamento)
-    const clearedCount = await unificationService.clearDocumentEntities(documentId);
-    if (clearedCount > 0) {
-      console.log(`   🗑️ ${clearedCount} entidades anteriores removidas`);
+    // Limpar dados anteriores (reprocessamento)
+    console.log(`\n🗑️  Limpando dados anteriores...`);
+    const cleared = await clearPreviousData(documentId);
+    if (cleared.entities > 0 || cleared.pages > 0) {
+      console.log(`   Removidos: ${cleared.entities} entidades, ${cleared.pages} páginas, ${cleared.sections} seções, ${cleared.timeline} eventos, ${cleared.risks} riscos`);
     }
     
     // 1. Baixar PDF do Minio
-    console.log('   → Baixando PDF do storage...');
+    console.log(`\n📥 Baixando PDF do storage...`);
     const pdfBuffer = await downloadFile(s3Key);
     console.log(`   ✓ PDF baixado (${(pdfBuffer.length / 1024).toFixed(2)} KB)`);
     
     // 2. Extrair texto por página
-    console.log('   → Extraindo texto das páginas...');
+    console.log(`\n📄 Extraindo texto das páginas...`);
     const pages = await extractPagesFromPDF(pdfBuffer);
     console.log(`   ✓ ${pages.length} página(s) extraída(s)`);
     
-    // Atualizar total de páginas
+    // 3. Criar registros de páginas no banco
+    console.log(`\n💾 Criando registros de páginas...`);
+    const pageRecords = await pageService.createPages(documentId, pages);
+    console.log(`   ✓ ${pageRecords.length} registros criados`);
+    
+    // 4. Calcular batches
+    const processingConfig = {
+      ...DEFAULT_PROCESSING_CONFIG,
+      wordCap: config.wordCap,
+      maxPagesPerBatch: config.maxPagesPerBatch,
+    };
+    
+    const batches = batchService.calculateBatches(pageRecords, processingConfig);
+    
+    console.log(`\n📦 Batches calculados: ${batches.length}`);
+    for (const batch of batches) {
+      console.log(`   Batch ${batch.batchNumber}: páginas ${batch.pages.map(p => p.pageNumber).join(', ')} (${batch.totalWords} palavras)`);
+    }
+    
+    // Atualizar documento com info de batches
     await updateDocumentStatus(documentId, 'PROCESSING', {
       totalPages: pages.length,
+      totalBatches: batches.length,
+      pagesProcessed: 0,
+      currentBatch: 0,
     });
     
-    // 3. Analisar documento completo com IA
-    console.log('   → Analisando edital com IA...\n');
+    // 5. Processar documento com batches
+    console.log(`\n🤖 Iniciando análise com IA...`);
     
-    const analysisResult = await analyzeDocumentWithAI(pages, documentId);
+    const analysisResult = await analyzeDocumentWithBatches(
+      documentId,
+      batches,
+      async (currentBatch, totalBatches) => {
+        // Callback de progresso
+        await updateDocumentStatus(documentId, 'PROCESSING', {
+          currentBatch,
+          pagesProcessed: batches
+            .slice(0, currentBatch)
+            .reduce((sum, b) => sum + b.pages.length, 0),
+        });
+      }
+    );
     
-    // 4. Atualizar status final
+    // 6. Atualizar status final
     const finalStatus: PDFDocument['status'] = analysisResult.success 
       ? 'COMPLETED' 
       : 'FAILED';
     
-    await updateDocumentStatus(documentId, finalStatus);
+    await updateDocumentStatus(documentId, finalStatus, {
+      processingCompletedAt: new Date(),
+      pagesProcessed: pages.length,
+      currentBatch: batches.length,
+    });
     
-    console.log(`\n✅ Edital processado com sucesso!`);
-    console.log(`   Páginas analisadas: ${analysisResult.pagesAnalyzed}/${analysisResult.totalPages}`);
-    console.log(`   Entidades extraídas: ${analysisResult.totalEntities}`);
+    // Log final
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`✅ PROCESSAMENTO CONCLUÍDO`);
+    console.log(`${'='.repeat(60)}`);
+    console.log(`   Status: ${finalStatus}`);
+    console.log(`   Páginas: ${pages.length}`);
+    console.log(`   Batches: ${analysisResult.totalBatches}`);
+    console.log(`   Seções: ${analysisResult.totalSections}`);
+    console.log(`   Entidades: ${analysisResult.totalEntities}`);
+    console.log(`   Timeline: ${analysisResult.totalTimelineEvents} eventos`);
+    console.log(`   Riscos: ${analysisResult.totalRisks}`);
+    console.log(`   Tempo total: ${(analysisResult.totalProcessingTimeMs / 1000).toFixed(2)}s`);
     
-    if (Object.keys(analysisResult.entitiesByType).length > 0) {
-      console.log(`   Distribuição por tipo:`);
-      for (const [type, count] of Object.entries(analysisResult.entitiesByType)) {
-        console.log(`     - ${type}: ${count}`);
+    if (!analysisResult.success) {
+      const failedBatches = analysisResult.batchResults.filter(b => !b.success);
+      console.log(`\n⚠️  ${failedBatches.length} batch(es) falharam:`);
+      for (const fb of failedBatches) {
+        console.log(`   - Batch ${fb.batchNumber}: ${fb.error}`);
       }
     }
     
   } catch (error) {
-    console.error(`\n❌ Erro ao processar edital ${documentId}:`, error);
+    console.error(`\n❌ ERRO AO PROCESSAR EDITAL ${documentId}:`, error);
     
-    // Atualizar status para FAILED
     await updateDocumentStatus(documentId, 'FAILED', {
+      processingCompletedAt: new Date(),
       error: error instanceof Error ? error.message : 'Erro desconhecido',
     });
     
     // Não re-lança o erro para não derrubar a fila
   }
+}
+
+/**
+ * Obtém estatísticas de um documento processado
+ */
+export async function getDocumentStats(documentId: string): Promise<{
+  document: PDFDocument | null;
+  pages: {
+    total: number;
+    completed: number;
+    failed: number;
+    pending: number;
+  };
+  structure: {
+    totalSections: number;
+    byLevel: Record<string, number>;
+  };
+  entities: {
+    total: number;
+    byType: Record<string, number>;
+  };
+  timeline: {
+    totalEvents: number;
+    byImportance: Record<string, number>;
+    upcomingCritical: number;
+  };
+  risks: {
+    total: number;
+    bySeverity: Record<string, number>;
+    criticalCount: number;
+  };
+}> {
+  const db = getDatabase();
+  const pageService = getPageService();
+  const structureService = getDocumentStructureService();
+  const timelineService = getTimelineService();
+  const riskService = getRiskService();
+  const unificationService = getEntityUnificationService();
+
+  // Buscar documento
+  const document = await db.collection<PDFDocument>('documents').findOne({
+    _id: new ObjectId(documentId),
+  });
+
+  // Estatísticas de páginas
+  const pageStats = await pageService.getProcessingStats(documentId);
+
+  // Estatísticas de estrutura
+  const structureStats = await structureService.getStructureStats(documentId);
+
+  // Estatísticas de entidades
+  const entities = await unificationService.findByDocumentId(documentId);
+  const entityByType: Record<string, number> = {};
+  for (const entity of entities) {
+    entityByType[entity.type] = (entityByType[entity.type] || 0) + 1;
+  }
+
+  // Estatísticas de timeline
+  const timelineStats = await timelineService.getTimelineStats(documentId);
+
+  // Estatísticas de riscos
+  const riskStats = await riskService.getRiskStats(documentId);
+
+  return {
+    document,
+    pages: {
+      total: pageStats.totalPages,
+      completed: pageStats.completedPages,
+      failed: pageStats.failedPages,
+      pending: pageStats.pendingPages + pageStats.processingPages,
+    },
+    structure: {
+      totalSections: structureStats.totalSections,
+      byLevel: structureStats.byLevel,
+    },
+    entities: {
+      total: entities.length,
+      byType: entityByType,
+    },
+    timeline: {
+      totalEvents: timelineStats.totalEvents,
+      byImportance: timelineStats.byImportance,
+      upcomingCritical: timelineStats.upcomingCritical,
+    },
+    risks: {
+      total: riskStats.totalRisks,
+      bySeverity: riskStats.bySeverity,
+      criticalCount: riskStats.criticalCount,
+    },
+  };
 }

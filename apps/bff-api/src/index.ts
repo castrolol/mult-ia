@@ -5,8 +5,14 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 
 import { connectDatabase } from './services/database.js';
+
+// Rotas
 import { upload } from './routes/upload.js';
 import { documents } from './routes/documents.js';
+import { timeline } from './routes/timeline.js';
+import { structure } from './routes/structure.js';
+import { risks } from './routes/risks.js';
+import { swagger } from './routes/swagger.js';
 
 const app = new Hono();
 
@@ -14,9 +20,27 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', cors());
 
-// Rotas
+// ============================================================================
+// ROTAS
+// ============================================================================
+
+// Upload de PDFs
 app.route('/upload', upload);
+
+// Documentos
 app.route('/documents', documents);
+
+// Timeline
+app.route('/timeline', timeline);
+
+// Estrutura
+app.route('/structure', structure);
+
+// Riscos
+app.route('/risks', risks);
+
+// Swagger
+app.route('/swagger', swagger);
 
 // Health check
 app.get('/health', (c) => {
@@ -43,12 +67,22 @@ async function main() {
     // Iniciar servidor
     const port = parseInt(process.env.PORT || '3000', 10);
     
-    console.log(`\n🚀 API rodando em http://localhost:${port}`);
-    console.log('   Endpoints:');
-    console.log('   - POST /upload           → Upload de PDF');
-    console.log('   - GET  /documents        → Listar documentos');
-    console.log('   - GET  /documents/:id    → Status do documento');
-    console.log('   - GET  /health           → Health check\n');
+    console.log(`\n🚀 BFF API rodando em http://localhost:${port}`);
+    console.log('');
+    console.log('📚 Documentação:');
+    console.log(`   - Swagger UI:  http://localhost:${port}/swagger/ui`);
+    console.log(`   - OpenAPI Spec: http://localhost:${port}/swagger/spec`);
+    console.log('');
+    console.log('📋 Endpoints principais:');
+    console.log('   - POST /upload               → Upload de PDF');
+    console.log('   - GET  /documents            → Listar documentos');
+    console.log('   - GET  /documents/:id        → Detalhes do documento');
+    console.log('   - POST /documents/:id/process → Iniciar processamento');
+    console.log('   - GET  /timeline/:id         → Timeline do documento');
+    console.log('   - GET  /structure/:id        → Estrutura hierárquica');
+    console.log('   - GET  /risks/:id            → Riscos identificados');
+    console.log('   - GET  /health               → Health check');
+    console.log('');
 
     serve({
       fetch: app.fetch,

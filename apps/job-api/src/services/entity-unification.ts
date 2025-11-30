@@ -14,16 +14,10 @@ import type {
   RawExtractedEntity,
   EntityConflict,
   UnificationResult,
-  DocumentReference,
+  EntitySource,
   EntityType,
-  EntityMetadata,
-  PrazoMetadata,
-  MultaMetadata,
-  RequisitoMetadata,
-  RegraEntregaMetadata,
-  RiscoMetadata,
-  CertidaoTecnicaMetadata,
-  DocumentacaoObrigatoriaMetadata,
+  EntityRelation,
+  ObligationDetails,
 } from '../types/entities.js';
 
 /**
@@ -49,37 +43,37 @@ export class EntityUnificationService {
       conflicts: [],
     };
 
+    // Mapa para resolver relacionamentos: semanticKey -> entityId
+    const semanticKeyToId = new Map<string, string>();
+
+    // Primeiro passo: criar todas as entidades
     for (const raw of rawEntities) {
-      // 1. Normalizar a entidade
       const normalized = this.normalizeEntity(documentId, raw);
 
-      // 2. Buscar entidade existente pela chave de deduplicação
-      const existing = await this.findByDeduplicationKey(
+      const existing = await this.findBySemanticKey(
         documentId,
-        normalized.deduplicationKey
+        normalized.semanticKey
       );
 
       if (!existing) {
-        // Nova entidade - salvar diretamente
         const saved = await this.saveEntity(normalized);
         result.entities.push(saved);
         result.created++;
+        semanticKeyToId.set(saved.semanticKey, saved.id);
       } else {
-        // Entidade existente - verificar se é duplicata ou conflito
         const mergeResult = this.attemptMerge(existing, normalized);
 
         if (mergeResult.success) {
-          // Merge bem-sucedido - adicionar referência
-          const newRef = normalized.references[0];
-          if (newRef) {
-            const updated = await this.addReference(existing, newRef);
+          const newSource = normalized.sources[0];
+          if (newSource) {
+            const updated = await this.addSource(existing, newSource);
             result.entities.push(updated);
           } else {
             result.entities.push(existing);
           }
           result.updated++;
+          semanticKeyToId.set(existing.semanticKey, existing.id);
         } else {
-          // Conflito detectado - resolver por confiança
           const conflict = await this.resolveConflictByConfidence(
             existing,
             normalized
@@ -87,12 +81,36 @@ export class EntityUnificationService {
           result.conflicts.push(conflict);
           result.conflictsResolved++;
 
-          // Retornar a entidade vencedora
           const winner =
             conflict.resolution === 'KEPT_EXISTING'
               ? existing
               : normalized;
           result.entities.push(winner);
+          semanticKeyToId.set(winner.semanticKey, winner.id);
+        }
+      }
+    }
+
+    // Segundo passo: resolver relacionamentos
+    for (const raw of rawEntities) {
+      if (raw.relatedSemanticKeys && raw.relatedSemanticKeys.length > 0) {
+        const entityId = semanticKeyToId.get(raw.semanticKey);
+        if (entityId) {
+          const relations: EntityRelation[] = [];
+          
+          for (const rel of raw.relatedSemanticKeys) {
+            const relatedId = semanticKeyToId.get(rel.semanticKey);
+            if (relatedId) {
+              relations.push({
+                entityId: relatedId,
+                relationship: rel.relationship,
+              });
+            }
+          }
+
+          if (relations.length > 0) {
+            await this.updateRelations(entityId, relations);
+          }
         }
       }
     }
@@ -108,29 +126,37 @@ export class EntityUnificationService {
     raw: RawExtractedEntity
   ): ExtractedEntity {
     const normalizedValue = this.normalizeValue(raw.type, raw.rawValue, raw.metadata);
-    const metadata = this.normalizeMetadata(raw.type, raw.metadata);
-    
-    // Usar a semanticKey da IA ou gerar uma nova
-    const deduplicationKey = raw.semanticKey || 
-      generateDeduplicationKey(raw.type, normalizedValue);
 
-    const reference: DocumentReference = {
+    const source: EntitySource = {
       pageNumber: raw.pageNumber,
-      sectionTitle: raw.sectionTitle,
-      excerptText: raw.excerptText.slice(0, 200), // Limitar tamanho
+      excerpt: raw.excerptText.slice(0, 300),
+      confidence: raw.confidence,
     };
+
+    // Converter obligationDetails se existir
+    let obligationDetails: ObligationDetails | undefined;
+    if (raw.obligationDetails) {
+      obligationDetails = {
+        action: raw.obligationDetails.action,
+        responsible: raw.obligationDetails.responsible,
+        mandatory: raw.obligationDetails.mandatory,
+        linkedDeadlineId: raw.obligationDetails.linkedDeadlineKey, // Será resolvido depois
+      };
+    }
 
     return {
       id: generateEntityId(),
       documentId,
-      pageId: raw.pageId,
       type: raw.type,
+      semanticKey: raw.semanticKey,
       name: raw.name,
       rawValue: raw.rawValue,
       normalizedValue,
-      deduplicationKey,
-      metadata,
-      references: [reference],
+      sectionId: raw.sectionId,
+      metadata: raw.metadata,
+      obligationDetails,
+      sources: [source],
+      relatedEntities: [],
       confidence: raw.confidence,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -146,7 +172,8 @@ export class EntityUnificationService {
     metadata: Record<string, unknown>
   ): string {
     switch (type) {
-      case 'PRAZO': {
+      case 'PRAZO':
+      case 'DATA': {
         const date = normalizeDate(rawValue);
         const time = normalizeTime(rawValue);
         if (date && time) {
@@ -155,7 +182,6 @@ export class EntityUnificationService {
         if (date) {
           return date;
         }
-        // Tentar extrair período em dias/meses
         const days = normalizeDaysPeriod(rawValue);
         if (days) {
           return `${days.days}${days.businessDays ? 'DU' : 'DC'}`;
@@ -167,7 +193,8 @@ export class EntityUnificationService {
         return rawValue;
       }
 
-      case 'MULTA': {
+      case 'MULTA':
+      case 'SANCAO': {
         const percentage = normalizePercentage(rawValue);
         if (percentage !== null) {
           return `${percentage}`;
@@ -181,11 +208,15 @@ export class EntityUnificationService {
 
       case 'REQUISITO':
       case 'CERTIDAO_TECNICA':
-      case 'DOCUMENTACAO_OBRIGATORIA': {
-        // Para requisitos, usar a categoria + especificação como valor normalizado
+      case 'DOCUMENTACAO': {
         const categoria = metadata.categoria || metadata.tipoDocumento || '';
         const item = metadata.itemRelacionado || metadata.tipoCertidao || '';
         return `${categoria}:${item}`.toUpperCase().replace(/\s+/g, '_');
+      }
+
+      case 'OBRIGACAO': {
+        const action = metadata.action || rawValue;
+        return String(action).toUpperCase().replace(/\s+/g, '_').slice(0, 100);
       }
 
       default:
@@ -194,107 +225,26 @@ export class EntityUnificationService {
   }
 
   /**
-   * Normaliza os metadados baseado no tipo da entidade
+   * Busca entidade existente pela semanticKey
    */
-  private normalizeMetadata(
-    type: EntityType,
-    raw: Record<string, unknown>
-  ): EntityMetadata {
-    switch (type) {
-      case 'PRAZO': {
-        const data: PrazoMetadata = {
-          tipoEvento: String(raw.tipoEvento || 'OUTRO'),
-          dataInicio: raw.dataInicio ? normalizeDate(String(raw.dataInicio)) || undefined : undefined,
-          dataFim: raw.dataFim ? normalizeDate(String(raw.dataFim)) || undefined : undefined,
-          horaLimite: raw.horaLimite ? normalizeTime(String(raw.horaLimite)) || undefined : undefined,
-          diasUteis: raw.diasUteis as boolean | undefined,
-          duracaoDias: raw.duracaoDias as number | undefined,
-        };
-        return { type: 'PRAZO', data };
-      }
-
-      case 'MULTA': {
-        const data: MultaMetadata = {
-          tipoInfracao: String(raw.tipoInfracao || 'OUTRO'),
-          percentual: raw.percentual !== undefined 
-            ? normalizePercentage(String(raw.percentual)) || undefined 
-            : undefined,
-          valorFixo: raw.valorFixo !== undefined 
-            ? normalizeMonetary(String(raw.valorFixo)) || undefined 
-            : undefined,
-          baseCalculo: raw.baseCalculo as string | undefined,
-          condicaoAplicacao: raw.condicaoAplicacao as string | undefined,
-        };
-        return { type: 'MULTA', data };
-      }
-
-      case 'REQUISITO': {
-        const data: RequisitoMetadata = {
-          categoria: (raw.categoria as RequisitoMetadata['categoria']) || 'OUTRO',
-          obrigatorio: raw.obrigatorio !== false,
-          itemRelacionado: raw.itemRelacionado as string | undefined,
-          especificacao: raw.especificacao as string | undefined,
-        };
-        return { type: 'REQUISITO', data };
-      }
-
-      case 'REGRA_ENTREGA': {
-        const data: RegraEntregaMetadata = {
-          localEntrega: raw.localEntrega as string | undefined,
-          prazoEntrega: raw.prazoEntrega as string | undefined,
-          condicoesTransporte: raw.condicoesTransporte as string | undefined,
-          embalagem: raw.embalagem as string | undefined,
-          horarioRecebimento: raw.horarioRecebimento as string | undefined,
-        };
-        return { type: 'REGRA_ENTREGA', data };
-      }
-
-      case 'RISCO': {
-        const data: RiscoMetadata = {
-          tipoRisco: (raw.tipoRisco as RiscoMetadata['tipoRisco']) || 'OUTRO',
-          gravidade: (raw.gravidade as RiscoMetadata['gravidade']) || 'MEDIA',
-          condicaoAtivacao: raw.condicaoAtivacao as string | undefined,
-        };
-        return { type: 'RISCO', data };
-      }
-
-      case 'CERTIDAO_TECNICA': {
-        const data: CertidaoTecnicaMetadata = {
-          tipoCertidao: String(raw.tipoCertidao || 'ATESTADO'),
-          emissor: raw.emissor as string | undefined,
-          validadeMinima: raw.validadeMinima as string | undefined,
-          quantidadeMinima: raw.quantidadeMinima as number | undefined,
-          descricaoExigencia: raw.descricaoExigencia as string | undefined,
-        };
-        return { type: 'CERTIDAO_TECNICA', data };
-      }
-
-      case 'DOCUMENTACAO_OBRIGATORIA': {
-        const data: DocumentacaoObrigatoriaMetadata = {
-          tipoDocumento: (raw.tipoDocumento as DocumentacaoObrigatoriaMetadata['tipoDocumento']) || 'OUTRO',
-          prazoValidade: raw.prazoValidade as string | undefined,
-          emissor: raw.emissor as string | undefined,
-          finalidade: raw.finalidade as string | undefined,
-        };
-        return { type: 'DOCUMENTACAO_OBRIGATORIA', data };
-      }
-
-      default:
-        return { type: type, data: raw } as EntityMetadata;
-    }
+  async findBySemanticKey(
+    documentId: string,
+    semanticKey: string
+  ): Promise<ExtractedEntity | null> {
+    return this.collection.findOne({
+      documentId,
+      semanticKey,
+    });
   }
 
   /**
-   * Busca entidade existente pela chave de deduplicação
+   * @deprecated Use findBySemanticKey
    */
   async findByDeduplicationKey(
     documentId: string,
     deduplicationKey: string
   ): Promise<ExtractedEntity | null> {
-    return this.collection.findOne({
-      documentId,
-      deduplicationKey,
-    });
+    return this.findBySemanticKey(documentId, deduplicationKey);
   }
 
   /**
@@ -302,6 +252,28 @@ export class EntityUnificationService {
    */
   async findByDocumentId(documentId: string): Promise<ExtractedEntity[]> {
     return this.collection.find({ documentId }).toArray();
+  }
+
+  /**
+   * Conta entidades por tipo (otimizado com aggregation)
+   */
+  async countByType(documentId: string): Promise<{ total: number; byType: Record<string, number> }> {
+    const pipeline = [
+      { $match: { documentId } },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+    ];
+    
+    const results = await this.collection.aggregate<{ _id: string; count: number }>(pipeline).toArray();
+    
+    const byType: Record<string, number> = {};
+    let total = 0;
+    
+    for (const result of results) {
+      byType[result._id] = result.count;
+      total += result.count;
+    }
+    
+    return { total, byType };
   }
 
   /**
@@ -319,9 +291,9 @@ export class EntityUnificationService {
    */
   async getExistingSemanticKeys(documentId: string): Promise<string[]> {
     const entities = await this.collection
-      .find({ documentId }, { projection: { deduplicationKey: 1 } })
+      .find({ documentId }, { projection: { semanticKey: 1 } })
       .toArray();
-    return entities.map((e) => e.deduplicationKey);
+    return entities.map((e) => e.semanticKey);
   }
 
   /**
@@ -331,12 +303,10 @@ export class EntityUnificationService {
     existing: ExtractedEntity,
     incoming: ExtractedEntity
   ): { success: boolean; reason?: string } {
-    // Se os valores normalizados são iguais, é duplicata válida
     if (existing.normalizedValue === incoming.normalizedValue) {
       return { success: true };
     }
 
-    // Verificar se é variação aceitável
     if (this.isAcceptableVariation(existing, incoming)) {
       return { success: true };
     }
@@ -354,17 +324,15 @@ export class EntityUnificationService {
     existing: ExtractedEntity,
     incoming: ExtractedEntity
   ): boolean {
-    // Para valores numéricos, permitir pequena tolerância
     const existingNum = parseFloat(existing.normalizedValue);
     const incomingNum = parseFloat(incoming.normalizedValue);
 
     if (!isNaN(existingNum) && !isNaN(incomingNum)) {
       const diff = Math.abs(existingNum - incomingNum);
-      const tolerance = Math.max(existingNum, incomingNum) * 0.001; // 0.1%
+      const tolerance = Math.max(existingNum, incomingNum) * 0.001;
       return diff <= tolerance;
     }
 
-    // Para strings, verificar se são equivalentes após normalização
     const existingNorm = existing.normalizedValue
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '');
@@ -383,7 +351,7 @@ export class EntityUnificationService {
     incoming: ExtractedEntity
   ): Promise<EntityConflict> {
     const conflict: EntityConflict = {
-      deduplicationKey: existing.deduplicationKey,
+      semanticKey: existing.semanticKey,
       existingEntity: existing,
       incomingEntity: incoming,
       conflictType: 'VALUE_MISMATCH',
@@ -391,22 +359,19 @@ export class EntityUnificationService {
       detectedAt: new Date(),
     };
 
-    // Se a nova entidade tem maior confiança, substituir
     if (incoming.confidence > existing.confidence) {
-      // Mesclar referências
-      const mergedReferences = [
-        ...existing.references,
-        ...incoming.references.filter(
-          (r) =>
-            !existing.references.some(
-              (er) =>
-                er.pageNumber === r.pageNumber &&
-                er.excerptText === r.excerptText
+      const mergedSources = [
+        ...existing.sources,
+        ...incoming.sources.filter(
+          (s) =>
+            !existing.sources.some(
+              (es) =>
+                es.pageNumber === s.pageNumber &&
+                es.excerpt === s.excerpt
             )
         ),
       ];
 
-      // Atualizar a entidade existente com os novos valores
       await this.collection.updateOne(
         { id: existing.id },
         {
@@ -415,7 +380,7 @@ export class EntityUnificationService {
             normalizedValue: incoming.normalizedValue,
             metadata: incoming.metadata,
             confidence: incoming.confidence,
-            references: mergedReferences,
+            sources: mergedSources,
             updatedAt: new Date(),
           },
         }
@@ -423,10 +388,9 @@ export class EntityUnificationService {
 
       conflict.resolution = 'REPLACED_WITH_INCOMING';
     } else {
-      // Manter existente, mas adicionar referência
-      const incomingRef = incoming.references[0];
-      if (incomingRef) {
-        await this.addReference(existing, incomingRef);
+      const incomingSource = incoming.sources[0];
+      if (incomingSource) {
+        await this.addSource(existing, incomingSource);
       }
       conflict.resolution = 'KEPT_EXISTING';
     }
@@ -435,31 +399,64 @@ export class EntityUnificationService {
   }
 
   /**
-   * Adiciona nova referência a uma entidade existente
+   * Adiciona nova fonte a uma entidade existente
    */
-  private async addReference(
+  private async addSource(
     entity: ExtractedEntity,
-    reference: DocumentReference
+    source: EntitySource
   ): Promise<ExtractedEntity> {
-    // Evitar referências duplicadas
-    const existingRef = entity.references.find(
-      (r) =>
-        r.pageNumber === reference.pageNumber &&
-        r.excerptText === reference.excerptText
+    const existingSource = entity.sources.find(
+      (s) =>
+        s.pageNumber === source.pageNumber &&
+        s.excerpt === source.excerpt
     );
 
-    if (!existingRef) {
-      entity.references.push(reference);
+    if (!existingSource) {
+      entity.sources.push(source);
       await this.collection.updateOne(
         { id: entity.id },
         {
-          $push: { references: reference },
+          $push: { sources: source },
           $set: { updatedAt: new Date() },
         }
       );
     }
 
     return entity;
+  }
+
+  /**
+   * Atualiza os relacionamentos de uma entidade
+   */
+  private async updateRelations(
+    entityId: string,
+    relations: EntityRelation[]
+  ): Promise<void> {
+    await this.collection.updateOne(
+      { id: entityId },
+      {
+        $set: { 
+          relatedEntities: relations,
+          updatedAt: new Date(),
+        },
+      }
+    );
+  }
+
+  /**
+   * Adiciona relacionamento a uma entidade
+   */
+  async addRelation(
+    entityId: string,
+    relation: EntityRelation
+  ): Promise<void> {
+    await this.collection.updateOne(
+      { id: entityId },
+      {
+        $addToSet: { relatedEntities: relation },
+        $set: { updatedAt: new Date() },
+      }
+    );
   }
 
   /**
@@ -477,6 +474,33 @@ export class EntityUnificationService {
     const result = await this.collection.deleteMany({ documentId });
     return result.deletedCount;
   }
+
+  /**
+   * Busca entidade por ID
+   */
+  async findById(entityId: string): Promise<ExtractedEntity | null> {
+    return this.collection.findOne({ id: entityId });
+  }
+
+  /**
+   * Busca entidades relacionadas a uma entidade
+   */
+  async findRelatedEntities(entityId: string): Promise<ExtractedEntity[]> {
+    const entity = await this.findById(entityId);
+    if (!entity || !entity.relatedEntities.length) {
+      return [];
+    }
+
+    const relatedIds = entity.relatedEntities.map(r => r.entityId);
+    return this.collection.find({ id: { $in: relatedIds } }).toArray();
+  }
+
+  /**
+   * Busca entidades por seção
+   */
+  async findBySectionId(sectionId: string): Promise<ExtractedEntity[]> {
+    return this.collection.find({ sectionId }).toArray();
+  }
 }
 
 // Singleton para reutilização
@@ -488,4 +512,3 @@ export function getEntityUnificationService(): EntityUnificationService {
   }
   return serviceInstance;
 }
-
