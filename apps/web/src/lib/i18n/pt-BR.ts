@@ -300,10 +300,13 @@ export function formatDaysRemaining(date: string | Date | null): string {
   const diffTime = d.getTime() - now.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-  if (diffDays < 0) return ui.vencido
+  if (diffDays < 0) {
+    const daysAgo = Math.abs(diffDays)
+    return daysAgo === 1 ? 'Há 1 dia' : `Há ${daysAgo} dias`
+  }
   if (diffDays === 0) return ui.venceHoje
-  if (diffDays === 1) return `1 ${ui.diaRestante}`
-  return `${diffDays} ${ui.diasRestantes}`
+  if (diffDays === 1) return 'Em 1 dia'
+  return `Em ${diffDays} dias`
 }
 
 /**

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { UploadArea } from '@workspace/ui/components/upload-area'
+import { toast } from '@workspace/ui/components/sonner'
 import type { FileRejection } from 'react-dropzone'
 import { useUploadDocument, useDocuments } from '@/lib/hooks'
 import { documentStatus as statusLabels, ui } from '@/lib/i18n'
@@ -92,12 +93,14 @@ export function PDFUploader() {
       setLocalFiles((prev) => [...prev, newFile])
 
       try {
-        const result = await uploadMutation.mutateAsync(file)
+        await uploadMutation.mutateAsync(file)
 
-        // Navegar diretamente para o documento
-        router.push(
-          `/documents/${result.documentId}?name=${encodeURIComponent(result.filename)}`
-        )
+        // Navegar para lista de documentos e mostrar toast
+        toast.info('O processamento começará em breve', {
+          description: 'Você será notificado quando o documento estiver pronto.',
+          duration: 5000,
+        })
+        router.push('/documents')
       } catch (err) {
         setLocalFiles((prev) =>
           prev.map((f) =>

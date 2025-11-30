@@ -70,42 +70,52 @@ export default function DocumentsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {documents.map((doc) => {
             const docId = doc.id || doc._id || ''
-            return (
-              <Link
-                key={docId}
-                href={`/documents/${docId}?name=${encodeURIComponent(doc.filename)}`}
-              >
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <StatusBadge status={doc.status} />
-                    </div>
-                    <CardTitle className="line-clamp-1">{doc.filename}</CardTitle>
-                    <CardDescription>
-                      {doc.totalPages
-                        ? `${doc.totalPages} ${ui.paginas}`
-                        : statusLabels.PROCESSING}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Clock className="mr-2 h-4 w-4" />
-                      {new Date(doc.createdAt).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </div>
-                    {doc.error && (
-                      <p className="text-sm text-destructive mt-2 line-clamp-2">
-                        {doc.error}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
+            const isCompleted = doc.status === 'COMPLETED'
+            
+            const cardContent = (
+              <Card className={`h-full transition-shadow ${isCompleted ? 'hover:shadow-lg cursor-pointer' : 'opacity-80'}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <FileText className={`h-8 w-8 ${isCompleted ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <StatusBadge status={doc.status} />
+                  </div>
+                  <CardTitle className="line-clamp-1">{doc.filename}</CardTitle>
+                  <CardDescription>
+                    {doc.totalPages
+                      ? `${doc.totalPages} ${ui.paginas}`
+                      : statusLabels.PROCESSING}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Clock className="mr-2 h-4 w-4" />
+                    {new Date(doc.createdAt).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </div>
+                  {doc.error && (
+                    <p className="text-sm text-destructive mt-2 line-clamp-2">
+                      {doc.error}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             )
+
+            if (isCompleted) {
+              return (
+                <Link
+                  key={docId}
+                  href={`/documents/${docId}?name=${encodeURIComponent(doc.filename)}`}
+                >
+                  {cardContent}
+                </Link>
+              )
+            }
+
+            return <div key={docId}>{cardContent}</div>
           })}
         </div>
       )}
@@ -119,21 +129,25 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
       label: statusLabels.PENDING,
       variant: 'secondary' as const,
       icon: Clock,
+      className: '',
     },
     PROCESSING: {
       label: statusLabels.PROCESSING,
-      variant: 'default' as const,
+      variant: 'outline' as const,
       icon: Loader2,
+      className: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-700',
     },
     COMPLETED: {
       label: statusLabels.COMPLETED,
       variant: 'default' as const,
       icon: CheckCircle2,
+      className: '',
     },
     FAILED: {
       label: statusLabels.FAILED,
       variant: 'destructive' as const,
       icon: XCircle,
+      className: '',
     },
   }
 
@@ -141,7 +155,7 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
   const Icon = config.icon
 
   return (
-    <Badge variant={config.variant} className="flex items-center gap-1">
+    <Badge variant={config.variant} className={`flex items-center gap-1 ${config.className}`}>
       <Icon className={`h-3 w-3 ${status === 'PROCESSING' ? 'animate-spin' : ''}`} />
       {config.label}
     </Badge>

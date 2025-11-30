@@ -110,11 +110,21 @@ export function DocumentViewer({
     useState<TimelineEvent | null>(null)
   const [zoomLevel, setZoomLevel] = useState(100)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null)
 
   const documentName =
     propDocumentName || document?.filename || 'documento.pdf'
   const statusLabel = document?.status ? documentStatus[document.status] : ''
-  const totalPages = document?.totalPages || 1
+  // Usar o total de páginas do PDF se disponível, senão do documento
+  const totalPages = pdfTotalPages || document?.totalPages || 1
+
+  const handlePdfPageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePdfLoad = (numPages: number) => {
+    setPdfTotalPages(numPages)
+  }
 
   const timeline = timelineData?.allEvents || []
   const structure = structureData?.tree || []
@@ -294,6 +304,9 @@ export function DocumentViewer({
               error={pdfError}
               onRetry={() => refetchPdf()}
               className="h-full w-full"
+              currentPage={currentPage}
+              onPageChange={handlePdfPageChange}
+              onDocumentLoad={handlePdfLoad}
             />
           ) : (
             <div className="flex-1 h-full flex items-center justify-center bg-muted/20">

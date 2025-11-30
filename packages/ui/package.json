@@ -16,6 +16,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-dropzone": "^14.3.8",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tw-animate-css": "^1.3.6",
     "zod": "^3.25.76"
@@ -55,6 +56,7 @@
     "./components/textarea": "./src/components/textarea.tsx",
     "./components/timeline": "./src/components/timeline.tsx",
     "./components/upload-area": "./src/components/upload-area.tsx",
+    "./components/sonner": "./src/components/sonner.tsx",
     "./hooks/*": "./src/hooks/*.ts"
   }
 }

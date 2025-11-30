@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Loader2, AlertCircle, Maximize2 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { Viewer, Worker, SpecialZoomLevel } from '@react-pdf-viewer/core'
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout'
+import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation'
 import {
   highlightPlugin,
   MessageIcon,
@@ -17,6 +18,7 @@ import {
 import '@react-pdf-viewer/core/lib/styles/index.css'
 import '@react-pdf-viewer/default-layout/lib/styles/index.css'
 import '@react-pdf-viewer/highlight/lib/styles/index.css'
+import '@react-pdf-viewer/page-navigation/lib/styles/index.css'
 
 import { ui } from '@/lib/i18n'
 
@@ -47,6 +49,12 @@ interface PdfViewerProps {
   highlights?: PdfHighlightData[]
   /** Classes CSS adicionais */
   className?: string
+  /** Página atual (1-indexed) */
+  currentPage?: number
+  /** Callback quando a página muda */
+  onPageChange?: (page: number) => void
+  /** Callback quando o total de páginas é determinado */
+  onDocumentLoad?: (totalPages: number) => void
   /** Callback quando um highlight é clicado */
   onHighlightClick?: (highlight: PdfHighlightData) => void
   /** Callback quando uma nova área é selecionada */
@@ -64,10 +72,26 @@ export function PdfViewer({
   url,
   highlights = [],
   className = '',
+  currentPage = 1,
+  onPageChange,
+  onDocumentLoad,
   onHighlightClick,
   onSelectionFinished,
 }: PdfViewerProps) {
   const [isReady, setIsReady] = useState(false)
+  const hasJumpedRef = useRef(false)
+
+  // Plugin de navegação de páginas
+  const pageNavigationPluginInstance = pageNavigationPlugin()
+  const { jumpToPage } = pageNavigationPluginInstance
+
+  // Ir para a página quando currentPage muda
+  useEffect(() => {
+    if (isReady && currentPage > 0) {
+      // A API usa 0-indexed, mas currentPage é 1-indexed
+      jumpToPage(currentPage - 1)
+    }
+  }, [currentPage, isReady, jumpToPage])
 
   const handleOpenInNewTab = () => {
     window.open(url, '_blank')
@@ -179,9 +203,17 @@ export function PdfViewer({
         <Worker workerUrl={WORKER_URL}>
           <Viewer
             fileUrl={url}
-            plugins={[defaultLayoutPluginInstance, highlightPluginInstance]}
+            plugins={[defaultLayoutPluginInstance, highlightPluginInstance, pageNavigationPluginInstance]}
             defaultScale={SpecialZoomLevel.PageWidth}
-            onDocumentLoad={() => setIsReady(true)}
+            initialPage={currentPage - 1}
+            onDocumentLoad={(e) => {
+              setIsReady(true)
+              onDocumentLoad?.(e.doc.numPages)
+            }}
+            onPageChange={(e) => {
+              // e.currentPage é 0-indexed
+              onPageChange?.(e.currentPage + 1)
+            }}
             renderLoader={(percentages: number) => (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
@@ -225,6 +257,9 @@ interface PdfViewerWithStatesProps {
   onRetry?: () => void
   highlights?: PdfHighlightData[]
   className?: string
+  currentPage?: number
+  onPageChange?: (page: number) => void
+  onDocumentLoad?: (totalPages: number) => void
   onHighlightClick?: (highlight: PdfHighlightData) => void
   onSelectionFinished?: (selection: {
     selectedText: string
@@ -239,6 +274,9 @@ export function PdfViewerWithStates({
   onRetry,
   highlights = [],
   className = '',
+  currentPage,
+  onPageChange,
+  onDocumentLoad,
   onHighlightClick,
   onSelectionFinished,
 }: PdfViewerWithStatesProps) {
@@ -277,6 +315,9 @@ export function PdfViewerWithStates({
       url={url}
       highlights={highlights}
       className={className}
+      currentPage={currentPage}
+      onPageChange={onPageChange}
+      onDocumentLoad={onDocumentLoad}
       onHighlightClick={onHighlightClick}
       onSelectionFinished={onSelectionFinished}
     />
