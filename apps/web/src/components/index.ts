@@ -10,4 +10,6 @@ export type { PdfHighlightData } from './pdf-viewer'
 export { HierarchyTree, SectionDetail } from './hierarchy-tree'
 export { TimelineView, TimelineByPhase, EventDetail } from './timeline-view'
 export { CommentsPanel, CommentsInline } from './comments-panel'
+export { RiskPanel, RiskDetail } from './risk-panel'
+export { ChatPanel } from './chat-panel'
 
