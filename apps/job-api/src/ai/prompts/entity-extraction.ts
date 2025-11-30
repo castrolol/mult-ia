@@ -17,6 +17,7 @@ Datas e prazos importantes:
 - Prazo de garantia
 - Prazo de pagamento
 - Prazo de vigência do contrato
+- Ps.: Todos os prazos devem ser extraídos como datas, ou periodos referentes a datas, ex.. 5 dias após a data de inicio, 5 de setembro de 2025, 05/09/2025
 
 ### REGRA_ENTREGA
 Condições de entrega de produtos/serviços:
@@ -93,7 +94,7 @@ Retorne um JSON com a estrutura:
     {
       "type": "PRAZO",
       "name": "Sessão Pública do Pregão",
-      "rawValue": "24 DE SETEMBRO DE 2024 ÀS 09:01H",
+      "rawValue": "24 DE SETEMBRO DE 2024 ÀS 09:01H", // o raw value é importante para a referencia do valor visualmente para o cliente
       "semanticKey": "SESSAO_PUBLICA:2024-09-24",
       "metadata": {
         "dataFim": "2024-09-24",

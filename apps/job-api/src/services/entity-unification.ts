@@ -123,6 +123,7 @@ export class EntityUnificationService {
     return {
       id: generateEntityId(),
       documentId,
+      pageId: raw.pageId,
       type: raw.type,
       name: raw.name,
       rawValue: raw.rawValue,

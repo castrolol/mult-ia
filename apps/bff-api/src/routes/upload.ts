@@ -40,7 +40,7 @@ async function parseFormData(
 
 // Notificar job-api para processar o documento
 async function notifyJobApi(documentId: string, s3Key: string): Promise<void> {
-  const jobApiUrl = process.env.JOB_API_URL || 'http://localhost:3001';
+  const jobApiUrl = process.env.JOB_API_URL || 'http://localhost:3002';
 
   const response = await fetch(`${jobApiUrl}/process`, {
     method: 'POST',

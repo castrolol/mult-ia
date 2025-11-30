@@ -2,10 +2,10 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { getDatabase } from '../services/database.js';
 import { getEntityUnificationService } from '../services/entity-unification.js';
-import type { 
-  ExtractedEntity, 
-  RawExtractedEntity, 
-  EntityType 
+import type {
+  ExtractedEntity,
+  RawExtractedEntity,
+  EntityType
 } from '../types/entities.js';
 
 /**
@@ -13,26 +13,30 @@ import type {
  */
 const EntityTypeSchema = z.enum([
   'PRAZO',
+  'DATA',	
   'REGRA_ENTREGA',
   'RISCO',
   'MULTA',
   'REQUISITO',
   'CERTIDAO_TECNICA',
   'DOCUMENTACAO_OBRIGATORIA',
-]).describe('Tipo de entidade, obrigatório estar dentro os tipos, se não for um dos tipos, não envie');
+  'INDEFINIDO',
+  'OUTRO',
+]).describe('Tipo de entidade. Valores: PRAZO, DATA, REGRA_ENTREGA, RISCO, MULTA, REQUISITO, CERTIDAO_TECNICA, DOCUMENTACAO_OBRIGATORIA, INDEFINIDO, OUTRO');
 
 /**
  * Schema Zod para entidade bruta extraída pela IA
+ * Nota: Todos os campos são obrigatórios para compatibilidade com a API da OpenAI
  */
 const RawEntitySchema = z.object({
   type: EntityTypeSchema,
   name: z.string().describe('Nome legível da entidade'),
   rawValue: z.string().describe('Valor bruto extraído do texto'),
   semanticKey: z.string().describe('Chave semântica única para identificar a entidade (ex: PRAZO:SESSAO_PUBLICA:2024-09-24)'),
-  metadata: z.record(z.unknown()).optional().default({}).describe('Metadados específicos do tipo de entidade (opcional)'),
-  confidence: z.number().min(0).max(1).optional().default(0.8).describe('Confiança da extração (0-1), padrão 0.8'),
-  excerptText: z.string().optional().default('').describe('Trecho original do documento (máx 200 chars)'),
-  sectionTitle: z.string().optional().describe('Título da seção onde a entidade foi encontrada'),
+  metadataJson: z.string().describe('Metadados específicos do tipo de entidade em formato JSON string. Use "{}" se não houver metadados'),
+  confidence: z.number().min(0).max(1).describe('Confiança da extração (0-1)'),
+  excerptText: z.string().describe('Trecho original do documento (máx 200 chars). Use string vazia se não houver'),
+  sectionTitle: z.string().describe('Título da seção onde a entidade foi encontrada. Use string vazia se não houver'),
 });
 
 /**
@@ -47,7 +51,7 @@ const CrossReferenceSchema = z.object({
 /**
  * Cria as tools disponíveis para a IA durante análise de páginas
  */
-export function createTools(documentId: string, pageNumber: number) {
+export function createTools(documentId: string, pageNumber: number, pageId: string) {
   const db = getDatabase();
   const unificationService = getEntityUnificationService();
 
@@ -63,16 +67,18 @@ export function createTools(documentId: string, pageNumber: number) {
         query: z
           .string()
           .describe('Termo de busca: pode ser semanticKey, nome ou tipo da entidade'),
-        type: EntityTypeSchema.optional().describe('Filtrar por tipo de entidade'),
+        type: z
+          .string()
+          .describe('Filtrar por tipo de entidade (PRAZO, DATA, REGRA_ENTREGA, RISCO, MULTA, REQUISITO, CERTIDAO_TECNICA, DOCUMENTACAO_OBRIGATORIA, INDEFINIDO, OUTRO)'),
       }),
       execute: async ({ query, type }) => {
         try {
           const filter: Record<string, unknown> = { documentId };
-          
+
           if (type) {
-            filter.type = type;
+            filter.type = type.toUpperCase() as EntityType;
           }
-          
+
           if (query.length >= 3) {
             filter.$or = [
               { deduplicationKey: { $regex: query, $options: 'i' } },
@@ -141,23 +147,36 @@ O serviço irá automaticamente:
           .describe('Lista de entidades extraídas da página'),
         crossReferences: z
           .array(CrossReferenceSchema)
-          .optional()
           .describe('Referências cruzadas identificadas entre entidades'),
       }),
       execute: async ({ entities, crossReferences }) => {
         try {
           // Converter para formato RawExtractedEntity
-          const rawEntities: RawExtractedEntity[] = entities.map((e) => ({
-            type: e.type as EntityType,
-            name: e.name,
-            rawValue: e.rawValue,
-            semanticKey: e.semanticKey,
-            metadata: e.metadata as Record<string, unknown>,
-            confidence: e.confidence,
-            pageNumber,
-            sectionTitle: e.sectionTitle,
-            excerptText: e.excerptText,
-          }));
+          const rawEntities: RawExtractedEntity[] = entities.map((e) => {
+            // Parse do metadataJson para objeto
+            let metadata: Record<string, unknown> = {};
+            try {
+              if (e.metadataJson && e.metadataJson !== '{}') {
+                metadata = JSON.parse(e.metadataJson);
+              }
+            } catch {
+              // Se falhar o parse, usar objeto vazio
+              metadata = {};
+            }
+
+            return {
+              type: e.type.toUpperCase() as EntityType,
+              name: e.name,
+              rawValue: e.rawValue,
+              semanticKey: e.semanticKey,
+              metadata,
+              confidence: e.confidence ?? 0.8,
+              pageNumber,
+              pageId,
+              sectionTitle: e.sectionTitle || undefined,
+              excerptText: e.excerptText || '',
+            };
+          });
 
           // Processar através do serviço de unificação
           const result = await unificationService.unifyEntities(

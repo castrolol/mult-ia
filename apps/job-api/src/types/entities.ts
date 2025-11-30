@@ -1,6 +1,48 @@
 import type { ObjectId } from 'mongodb';
 
 /**
+ * Status de processamento de uma página
+ */
+export type PageStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * Representa uma página de um documento no MongoDB
+ */
+export interface DocumentPage {
+  _id?: ObjectId;
+  
+  /** Identificador único da página */
+  id: string;
+  
+  /** ID do documento de origem */
+  documentId: string;
+  
+  /** Número da página no documento */
+  pageNumber: number;
+  
+  /** Conteúdo textual da página */
+  text: string;
+  
+  /** Status do processamento */
+  status: PageStatus;
+  
+  /** Tempo de processamento em milissegundos */
+  processingTimeMs?: number;
+  
+  /** Quantidade de entidades extraídas da página */
+  entitiesExtracted: number;
+  
+  /** Mensagem de erro se o processamento falhou */
+  error?: string;
+  
+  /** Data de criação do registro */
+  createdAt: Date;
+  
+  /** Data de conclusão do processamento */
+  completedAt?: Date;
+}
+
+/**
  * Tipos de entidades extraídas de editais de licitação
  */
 export type EntityType =
@@ -121,6 +163,9 @@ export interface ExtractedEntity {
   /** ID do documento de origem */
   documentId: string;
   
+  /** ID da página de origem */
+  pageId: string;
+  
   /** Tipo da entidade */
   type: EntityType;
   
@@ -206,6 +251,7 @@ export interface RawExtractedEntity {
   metadata: Record<string, unknown>;
   confidence: number;
   pageNumber: number;
+  pageId: string;
   sectionTitle?: string;
   excerptText: string;
 }
