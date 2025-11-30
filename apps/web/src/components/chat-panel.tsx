@@ -63,7 +63,7 @@ export function ChatPanel({ documentName, className }: ChatPanelProps) {
         'As garantias exigidas incluem garantia contratual de 5% do valor total e garantia técnica dos equipamentos.',
       ]
       const randomResponse =
-        aiResponses[Math.floor(Math.random() * aiResponses.length)]
+        aiResponses[Math.floor(Math.random() * aiResponses.length)] ?? 'Desculpe, não consegui processar sua pergunta. Pode reformular?'
 
       const newAiMsg: Message = {
         id: (Date.now() + 1).toString(),

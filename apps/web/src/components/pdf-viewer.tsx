@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Loader2, AlertCircle, Maximize2 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { Viewer, Worker, SpecialZoomLevel } from '@react-pdf-viewer/core'
@@ -9,7 +9,6 @@ import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation'
 import {
   highlightPlugin,
   MessageIcon,
-  RenderHighlightContentProps,
   RenderHighlightTargetProps,
   RenderHighlightsProps,
 } from '@react-pdf-viewer/highlight'
@@ -79,7 +78,6 @@ export function PdfViewer({
   onSelectionFinished,
 }: PdfViewerProps) {
   const [isReady, setIsReady] = useState(false)
-  const hasJumpedRef = useRef(false)
 
   // Plugin de navegação de páginas
   const pageNavigationPluginInstance = pageNavigationPlugin()
@@ -163,7 +161,7 @@ export function PdfViewer({
   )
 
   // Renderizar conteúdo do highlight (tooltip) - retorna fragmento vazio
-  const renderHighlightContent = (_props: RenderHighlightContentProps) => <></>
+  const renderHighlightContent = () => <></>
 
   // Plugin de highlight
   const highlightPluginInstance = highlightPlugin({

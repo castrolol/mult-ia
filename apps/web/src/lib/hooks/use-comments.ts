@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiClient, type TimelineComment } from '../api-client'
+import { apiClient } from '../api-client'
 
 // ============================================================================
 // QUERY KEYS

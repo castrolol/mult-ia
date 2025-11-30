@@ -1,11 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  apiClient,
-  type Document,
-  type DocumentStatus,
-} from '../api-client'
+import { apiClient, type DocumentStatus } from '../api-client'
 
 // ============================================================================
 // QUERY KEYS

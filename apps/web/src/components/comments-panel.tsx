@@ -53,6 +53,7 @@ export function CommentsPanel({
 
   const [newComment, setNewComment] = useState('')
   const [authorName, setAuthorName] = useState('')
+  const [isEditingAuthor, setIsEditingAuthor] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
 
@@ -174,8 +175,8 @@ export function CommentsPanel({
       {/* Formulário de novo comentário */}
       <div className="border-t p-4">
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Campo de autor (se não tiver salvo) */}
-          {!authorName && (
+          {/* Campo de autor (se estiver editando ou não tiver nome) */}
+          {isEditingAuthor ? (
             <div className="flex items-center gap-2">
               <User size={16} className="text-muted-foreground" />
               <input
@@ -183,10 +184,33 @@ export function CommentsPanel({
                 placeholder="Seu nome"
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && authorName.trim().length >= 2) {
+                    e.preventDefault()
+                    setIsEditingAuthor(false)
+                  }
+                }}
+                onBlur={() => {
+                  if (authorName.trim().length >= 2) {
+                    setIsEditingAuthor(false)
+                  }
+                }}
+                autoFocus
                 className="flex-1 bg-transparent text-sm border-b border-muted focus:border-primary outline-none py-1"
               />
+              {authorName.trim().length >= 2 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingAuthor(false)}
+                  className="text-xs h-7"
+                >
+                  Confirmar
+                </Button>
+              )}
             </div>
-          )}
+          ) : null}
 
           {/* Campo de comentário */}
           <div className="flex gap-2">
@@ -214,13 +238,13 @@ export function CommentsPanel({
           </div>
 
           {/* Indicador do autor atual */}
-          {authorName && (
+          {!isEditingAuthor && authorName && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <User size={12} />
               <span>Comentando como {authorName}</span>
               <button
                 type="button"
-                onClick={() => setAuthorName('')}
+                onClick={() => setIsEditingAuthor(true)}
                 className="text-primary hover:underline"
               >
                 Alterar

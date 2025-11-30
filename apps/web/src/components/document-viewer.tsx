@@ -11,7 +11,6 @@ import {
 } from '@/lib/hooks'
 import { documentStatus, ui } from '@/lib/i18n'
 import { Button } from '@workspace/ui/components/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs'
 import {
   AlertCircle,
   AlertTriangle,
@@ -31,9 +30,9 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useState } from 'react'
 import { CommentsPanel } from './comments-panel'
-import { HierarchyTree, SectionDetail } from './hierarchy-tree'
-import { EventDetail, TimelineView } from './timeline-view'
-import { RiskPanel, RiskDetail } from './risk-panel'
+import { HierarchyTree } from './hierarchy-tree'
+import { TimelineView } from './timeline-view'
+import { RiskPanel } from './risk-panel'
 import { ChatPanel } from './chat-panel'
 
 // Dynamic import para evitar SSR do PDF.js

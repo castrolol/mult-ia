@@ -1,12 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import { useRisks } from '@/lib/hooks'
 import type { Risk, ImportanceLevel, ProbabilityLevel } from '@/lib/api-client'
 import { importanceLevels, probabilityLevels, ui } from '@/lib/i18n'
 import { cn } from '@workspace/ui/lib/utils'
 import { Badge } from '@workspace/ui/components/badge'
-import { Button } from '@workspace/ui/components/button'
 import {
   AlertTriangle,
   AlertOctagon,
@@ -196,7 +194,7 @@ function RiskCard({ risk, isActive, onSelect }: RiskCardProps) {
       {risk.sources && risk.sources.length > 0 && (
         <div className="mt-3 flex justify-end">
           <span className="text-xs text-primary font-medium group-hover:underline flex items-center gap-0.5">
-            Ver no documento (p. {risk.sources[0].pageNumber})
+            Ver no documento (p. {risk?.sources?.[0]?.pageNumber || "N/A"})
             <ChevronRight className="w-3 h-3" />
           </span>
         </div>

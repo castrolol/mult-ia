@@ -5,25 +5,22 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   FileText,
-  Check,
   X,
   Trash2,
   Loader2,
-  UploadCloud,
   ArrowRight,
   File,
   Zap,
   Lock,
   BarChart3,
   ShieldAlert,
-  Clock,
 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { UploadArea } from '@workspace/ui/components/upload-area'
 import { toast } from '@workspace/ui/components/sonner'
 import type { FileRejection } from 'react-dropzone'
 import { useUploadDocument, useDocuments } from '@/lib/hooks'
-import { documentStatus as statusLabels, ui } from '@/lib/i18n'
+import { ui } from '@/lib/i18n'
 import type { DocumentStatus } from '@/lib/api-client'
 
 type FileStatus = 'uploading' | 'processing' | 'completed' | 'error'
@@ -57,7 +54,6 @@ export function PDFUploader() {
   const uploadMutation = useUploadDocument()
   const { data: documentsData, isLoading: docsLoading } = useDocuments()
   const [localFiles, setLocalFiles] = useState<FileItem[]>([])
-  const [isDragging, setIsDragging] = useState(false)
 
   // Documentos recentes da API (últimos 5)
   const recentDocuments = useMemo(() => {
@@ -78,8 +74,6 @@ export function PDFUploader() {
     acceptedFiles: File[],
     fileRejections: FileRejection[]
   ) => {
-    setIsDragging(false)
-
     // Processar arquivos aceitos
     for (const file of acceptedFiles) {
       const tempId = `temp-${Date.now()}-${Math.random()}`
