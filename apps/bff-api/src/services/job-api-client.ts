@@ -3,7 +3,7 @@
  * Centraliza todas as chamadas ao serviço de processamento
  */
 
-const JOB_API_URL = process.env.JOB_API_URL || 'http://localhost:3001';
+const JOB_API_URL = process.env.JOB_API_URL || 'http://localhost:3002';
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';

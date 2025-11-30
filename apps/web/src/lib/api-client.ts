@@ -1,71 +1,305 @@
-// API Client for communicating with the backend
-// Using relative URLs to work with Next.js API routes
-const API_BASE_URL = ''
+/**
+ * API Client para comunicação com o BFF
+ * Todas as chamadas passam pelo BFF que faz proxy para a Job API
+ */
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+
+// ============================================================================
+// TIPOS - Espelhados do Backend
+// ============================================================================
+
+export type DocumentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
+export type EntityType =
+  | 'PRAZO'
+  | 'DATA'
+  | 'OBRIGACAO'
+  | 'REQUISITO'
+  | 'MULTA'
+  | 'SANCAO'
+  | 'RISCO'
+  | 'REGRA_ENTREGA'
+  | 'CERTIDAO_TECNICA'
+  | 'DOCUMENTACAO'
+  | 'OUTRO'
+
+export type ImportanceLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+
+export type DocumentSectionLevel =
+  | 'CHAPTER'
+  | 'SECTION'
+  | 'CLAUSE'
+  | 'SUBCLAUSE'
+  | 'ITEM'
+
+export type LicitacaoPhase =
+  | 'PUBLICACAO'
+  | 'ESCLARECIMENTOS'
+  | 'IMPUGNACAO'
+  | 'CADASTRO'
+  | 'ENVIO_PROPOSTA'
+  | 'ABERTURA_PROPOSTAS'
+  | 'SESSAO_PUBLICA'
+  | 'LANCES'
+  | 'JULGAMENTO'
+  | 'HABILITACAO'
+  | 'RECURSOS'
+  | 'ADJUDICACAO'
+  | 'HOMOLOGACAO'
+  | 'ASSINATURA'
+  | 'EXECUCAO'
+  | 'PAGAMENTO'
+  | 'GARANTIA'
+  | 'OUTRO'
+
+export type DateType = 'FIXED' | 'RELATIVE' | 'RANGE'
+
+export type ProbabilityLevel = 'CERTAIN' | 'LIKELY' | 'POSSIBLE' | 'UNLIKELY'
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
 export interface Document {
   id: string
+  _id?: string
   filename: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-  totalPages: number | null
-  error: string | null
-  createdAt: Date
-  updatedAt: Date
+  s3Key?: string
+  status: DocumentStatus
+  totalPages?: number
+  error?: string
+  createdAt: string
+  updatedAt: string
 }
 
-export interface Entity {
+export interface DocumentSection {
   id: string
   documentId: string
-  type: string
-  name: string
-  description: string
-  value: string | null
-  priority: 'critical' | 'high' | 'medium' | 'low'
-  parentId: string | null
-  pageNumber: number | null
-  sourceText: string | null
-  metadata: Record<string, unknown> | null
-  createdAt: Date
-}
-
-export interface Deadline {
-  id: string
-  documentId: string
+  level: DocumentSectionLevel
+  parentId?: string
+  order: number
   title: string
-  description: string
-  dueDate: string
-  rules: string[]
-  requiredDocuments: string[]
-  technicalCertificates: string[]
-  priority: 'critical' | 'high' | 'medium' | 'low'
-  status: 'pending' | 'upcoming' | 'overdue' | 'completed'
-  createdAt: Date
-  penalties?: Penalty[]
+  number?: string
+  summary?: string
+  sourcePages: number[]
+  children?: DocumentSection[]
+  createdAt: string
 }
 
-export interface Penalty {
+export interface EntitySource {
+  pageNumber: number
+  lineStart?: number
+  lineEnd?: number
+  excerpt: string
+  confidence: number
+}
+
+export interface ExtractedEntity {
   id: string
-  deadlineId: string
+  documentId: string
+  type: EntityType
+  semanticKey: string
+  name: string
+  rawValue: string
+  normalizedValue: string
+  sectionId?: string
+  parentEntityId?: string
+  metadata: Record<string, unknown>
+  sources: EntitySource[]
+  confidence: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LinkedPenalty {
+  entityId: string
+  type: 'MULTA' | 'SANCAO'
   description: string
-  type: 'fixed' | 'percentage' | 'daily'
-  value: number
-  currency: string | null
-  conditions: string[]
-  createdAt: Date
+  value?: string
+}
+
+export interface LinkedRequirement {
+  entityId: string
+  type: 'REQUISITO' | 'CERTIDAO_TECNICA' | 'DOCUMENTACAO'
+  description: string
+  mandatory: boolean
+}
+
+export interface LinkedObligation {
+  entityId: string
+  description: string
+  actionRequired: string
+}
+
+export interface UrgencyMetadata {
+  daysUntilDeadline?: number
+  hasPenalty: boolean
+  penaltyAmount?: string
+  blockingForOthers: boolean
+}
+
+export interface RelativeTimeReference {
+  eventId: string
+  offset: number
+  unit: 'DAYS' | 'BUSINESS_DAYS' | 'MONTHS'
+  direction: 'BEFORE' | 'AFTER'
 }
 
 export interface TimelineEvent {
   id: string
   documentId: string
+  date: string | null
+  dateRaw: string
+  dateType: DateType
+  relativeTo?: RelativeTimeReference
+  eventType: string
+  phase: LicitacaoPhase
+  semanticOrder: number
   title: string
   description: string
-  date: string
-  time: string | null
-  type: 'upload' | 'processing' | 'analysis' | 'deadline' | 'alert' | 'reminder'
-  status: 'completed' | 'in_progress' | 'pending' | 'alert'
-  relatedEntityId: string | null
-  metadata: Record<string, unknown> | null
-  createdAt: Date
+  importance: ImportanceLevel
+  actionRequired?: string
+  linkedPenalties: LinkedPenalty[]
+  linkedRequirements: LinkedRequirement[]
+  linkedObligations: LinkedObligation[]
+  linkedRiskIds: string[]
+  urgency: UrgencyMetadata
+  tags: string[]
+  sourcePages: number[]
+  commentsCount: number
+  createdAt: string
 }
+
+export interface TimelineComment {
+  id: string
+  timelineEventId: string
+  documentId: string
+  content: string
+  author: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RiskMitigation {
+  action: string
+  deadline?: string
+  cost?: string
+}
+
+export interface Risk {
+  id: string
+  documentId: string
+  category: string
+  subcategory?: string
+  title: string
+  description: string
+  trigger: string
+  consequence: string
+  severity: ImportanceLevel
+  probability: ProbabilityLevel
+  mitigation?: RiskMitigation
+  linkedEntityIds: string[]
+  linkedTimelineIds: string[]
+  linkedSectionIds: string[]
+  sources: Array<{
+    pageNumber: number
+    excerpt: string
+    confidence: number
+  }>
+  createdAt: string
+}
+
+// ============================================================================
+// RESPOSTAS DA API
+// ============================================================================
+
+export interface DocumentsListResponse {
+  documents: Document[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+export interface TimelineResponse {
+  documentId: string
+  timeline: TimelineEvent[]
+  relativeEvents: TimelineEvent[]
+  unresolvedEvents: TimelineEvent[]
+  stats: {
+    total: number
+    withDate: number
+    relative: number
+    unresolved: number
+    byImportance: Record<ImportanceLevel, number>
+    upcomingCritical: number
+    tags: string[]
+  }
+}
+
+export interface TimelineByPhaseResponse {
+  documentId: string
+  phases: Array<{
+    phase: LicitacaoPhase
+    order: number
+    events: TimelineEvent[]
+    count: number
+  }>
+  totalEvents: number
+}
+
+export interface StructureResponse {
+  documentId: string
+  filename: string
+  tree: DocumentSection[]
+  stats: {
+    totalSections: number
+    byLevel: Record<DocumentSectionLevel, number>
+    maxDepth: number
+  }
+}
+
+export interface SectionDetailResponse extends DocumentSection {
+  breadcrumb: Array<{
+    id: string
+    number?: string
+    title: string
+    level: DocumentSectionLevel
+  }>
+  children: DocumentSection[]
+  entities: Array<{
+    id: string
+    type: EntityType
+    name: string
+    semanticKey: string
+  }>
+  childrenCount: number
+  entitiesCount: number
+}
+
+export interface RisksResponse {
+  documentId: string
+  risks: Risk[]
+  stats: {
+    total: number
+    bySeverity: Record<ImportanceLevel, number>
+    byCategory: Record<string, number>
+    needingMitigation: number
+  }
+}
+
+export interface CommentsResponse {
+  eventId: string
+  comments: TimelineComment[]
+  total: number
+}
+
+// ============================================================================
+// API CLIENT
+// ============================================================================
 
 class APIClient {
   private baseURL: string
@@ -101,211 +335,60 @@ class APIClient {
     }
   }
 
-  // Documents
-  async getDocuments(): Promise<{ documents: Document[] }> {
-    const response = await this.request<{
-      success: boolean
-      data: { documents: Document[] }
-    }>('/api/documents')
-    return response.data
+  // ============================================================================
+  // DOCUMENTOS
+  // ============================================================================
+
+  async getDocuments(params?: {
+    page?: number
+    limit?: number
+    status?: DocumentStatus
+  }): Promise<DocumentsListResponse> {
+    const searchParams = new URLSearchParams()
+    if (params?.page) searchParams.set('page', String(params.page))
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    if (params?.status) searchParams.set('status', params.status)
+
+    const query = searchParams.toString()
+    return this.request<DocumentsListResponse>(
+      `/documents${query ? `?${query}` : ''}`,
+    )
   }
 
-  async getDocument(id: string): Promise<{
-    document: Document
-    entities: Entity[]
-    deadlines: Deadline[]
-    timeline: TimelineEvent[]
-    analysis: {
-      summary: string
-      riskAssessment: {
-        level: 'low' | 'medium' | 'high' | 'critical'
-        factors: Array<{
-          type: string
-          description: string
-          severity: 'critical' | 'high' | 'medium' | 'low'
-          mitigation?: string
-        }>
-        recommendations: string[]
-      }
-      completedAt: Date
-    } | null
-    stats: {
-      totalEntities: number
-      totalDeadlines: number
-      criticalDeadlines: number
-      overdueDeadlines: number
-    }
-  }> {
-    const response = await this.request<{
-      success: boolean
-      data: {
-        document: Document
-        entities: Entity[]
-        deadlines: Deadline[]
-        timeline: TimelineEvent[]
-        analysis: {
-          summary: string
-          riskAssessment: {
-            level: 'low' | 'medium' | 'high' | 'critical'
-            factors: Array<{
-              type: string
-              description: string
-              severity: 'critical' | 'high' | 'medium' | 'low'
-              mitigation?: string
-            }>
-            recommendations: string[]
-          }
-          completedAt: Date
-        } | null
-        stats: {
-          totalEntities: number
-          totalDeadlines: number
-          criticalDeadlines: number
-          overdueDeadlines: number
-        }
-      }
-    }>(`/api/documents/${id}`)
-    return response.data
+  async getDocument(id: string): Promise<Document> {
+    return this.request<Document>(`/documents/${id}`)
   }
 
-  async getDocumentEntities(id: string): Promise<{
-    entities: Entity[]
-    groupedByType: Record<string, Entity[]>
-    hierarchy: Array<Entity & { children?: Entity[] }>
-    stats: {
-      total: number
-      byType: Array<{ type: string; count: number; critical: number }>
-      byPriority: {
-        critical: number
-        high: number
-        medium: number
-        low: number
-      }
-    }
-  }> {
-    const response = await this.request<{
-      success: boolean
-      data: {
-        entities: Entity[]
-        groupedByType: Record<string, Entity[]>
-        hierarchy: Array<Entity & { children?: Entity[] }>
-        stats: {
-          total: number
-          byType: Array<{ type: string; count: number; critical: number }>
-          byPriority: {
-            critical: number
-            high: number
-            medium: number
-            low: number
-          }
-        }
-      }
-    }>(`/api/documents/${id}/entities`)
-    return response.data
+  async getDocumentPdfUrl(
+    id: string,
+    expiresIn?: number,
+  ): Promise<{ url: string; expiresAt: string }> {
+    const query = expiresIn ? `?expiresIn=${expiresIn}` : ''
+    return this.request<{ url: string; expiresAt: string }>(
+      `/documents/${id}/pdf-url${query}`,
+    )
   }
 
-  async getDocumentDeadlines(id: string): Promise<{
-    deadlines: Deadline[]
-    groupedByStatus: {
-      overdue: Deadline[]
-      upcoming: Deadline[]
-      pending: Deadline[]
-      completed: Deadline[]
-    }
-    deadlineMap: Array<{
-      deadline: Deadline
-      requirements: Array<{ type: string; value: string }>
-      consequences: Array<{
-        type: string
-        value: number
-        currency: string
-        description: string
-      }>
-    }>
-    stats: {
-      total: number
-      overdue: number
-      upcoming: number
-      pending: number
-      completed: number
-      nextDeadline: Deadline | null
-      totalPenaltyRisk: number
-    }
+  async getDocumentSummary(id: string): Promise<{
+    summary: string
+    totalPages: number
+    entitiesCount: number
+    timelineEventsCount: number
+    risksCount: number
   }> {
-    const response = await this.request<{
-      success: boolean
-      data: {
-        deadlines: Deadline[]
-        groupedByStatus: {
-          overdue: Deadline[]
-          upcoming: Deadline[]
-          pending: Deadline[]
-          completed: Deadline[]
-        }
-        deadlineMap: Array<{
-          deadline: Deadline
-          requirements: Array<{ type: string; value: string }>
-          consequences: Array<{
-            type: string
-            value: number
-            currency: string
-            description: string
-          }>
-        }>
-        stats: {
-          total: number
-          overdue: number
-          upcoming: number
-          pending: number
-          completed: number
-          nextDeadline: Deadline | null
-          totalPenaltyRisk: number
-        }
-      }
-    }>(`/api/documents/${id}/deadlines`)
-    return response.data
-  }
-
-  async getDocumentTimeline(id: string): Promise<{
-    events: TimelineEvent[]
-    groupedByDate: Record<string, TimelineEvent[]>
-    criticalAlerts: TimelineEvent[]
-    summary: {
-      total: number
-      completed: number
-      pending: number
-      alerts: number
-    }
-  }> {
-    const response = await this.request<{
-      success: boolean
-      data: {
-        events: TimelineEvent[]
-        groupedByDate: Record<string, TimelineEvent[]>
-        criticalAlerts: TimelineEvent[]
-        summary: {
-          total: number
-          completed: number
-          pending: number
-          alerts: number
-        }
-      }
-    }>(`/api/documents/${id}/timeline`)
-    return response.data
+    return this.request(`/documents/${id}/summary`)
   }
 
   async uploadDocument(file: File): Promise<{
-    success: boolean
-    data: {
-      document: Document
-      message: string
-      nextStep: string
-    }
+    message: string
+    documentId: string
+    filename: string
+    status: DocumentStatus
   }> {
     const formData = new FormData()
     formData.append('file', file)
 
-    const url = `${this.baseURL}/api/upload`
+    const url = `${this.baseURL}/upload`
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
@@ -320,31 +403,198 @@ class APIClient {
   }
 
   async processDocument(id: string): Promise<{
-    success: boolean
-    data: {
-      document: Document
-      analysis: {
-        summary: string
-        entitiesCount: number
-        deadlinesCount: number
-        riskLevel: 'low' | 'medium' | 'high' | 'critical'
-      } | null
-      processingTime: number
-    }
+    message: string
+    documentId: string
+    status: DocumentStatus
   }> {
-    const response = await fetch(
-      `${this.baseURL}/api/documents/${id}/process`,
+    return this.request(`/documents/${id}/process`, {
+      method: 'POST',
+    })
+  }
+
+  // ============================================================================
+  // TIMELINE
+  // ============================================================================
+
+  async getTimeline(documentId: string): Promise<TimelineResponse> {
+    return this.request<TimelineResponse>(`/timeline/${documentId}`)
+  }
+
+  async getTimelineCritical(
+    documentId: string,
+    days?: number,
+  ): Promise<{
+    documentId: string
+    daysAhead: number
+    events: TimelineEvent[]
+    total: number
+  }> {
+    const query = days ? `?days=${days}` : ''
+    return this.request(`/timeline/${documentId}/critical${query}`)
+  }
+
+  async getTimelineByPhase(
+    documentId: string,
+  ): Promise<TimelineByPhaseResponse> {
+    return this.request<TimelineByPhaseResponse>(
+      `/timeline/${documentId}/by-phase`,
+    )
+  }
+
+  async getTimelineEvent(
+    documentId: string,
+    eventId: string,
+  ): Promise<TimelineEvent & { comments: TimelineComment[] }> {
+    return this.request(`/timeline/${documentId}/events/${eventId}`)
+  }
+
+  // ============================================================================
+  // COMENTÁRIOS
+  // ============================================================================
+
+  async getComments(
+    documentId: string,
+    eventId: string,
+  ): Promise<CommentsResponse> {
+    return this.request<CommentsResponse>(
+      `/timeline/${documentId}/events/${eventId}/comments`,
+    )
+  }
+
+  async addComment(
+    documentId: string,
+    eventId: string,
+    content: string,
+    author: string,
+  ): Promise<TimelineComment> {
+    return this.request(`/timeline/${documentId}/events/${eventId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content, author }),
+    })
+  }
+
+  async updateComment(
+    documentId: string,
+    eventId: string,
+    commentId: string,
+    content: string,
+  ): Promise<TimelineComment> {
+    return this.request(
+      `/timeline/${documentId}/events/${eventId}/comments/${commentId}`,
       {
-        method: 'POST',
+        method: 'PUT',
+        body: JSON.stringify({ content }),
       },
     )
+  }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}))
-      throw new Error(error.error || `HTTP ${response.status}`)
-    }
+  async deleteComment(
+    documentId: string,
+    eventId: string,
+    commentId: string,
+  ): Promise<{ success: boolean }> {
+    return this.request(
+      `/timeline/${documentId}/events/${eventId}/comments/${commentId}`,
+      {
+        method: 'DELETE',
+      },
+    )
+  }
 
-    return response.json()
+  // ============================================================================
+  // ESTRUTURA
+  // ============================================================================
+
+  async getStructure(documentId: string): Promise<StructureResponse> {
+    return this.request<StructureResponse>(`/structure/${documentId}`)
+  }
+
+  async getStructureFlat(
+    documentId: string,
+    level?: DocumentSectionLevel,
+  ): Promise<{
+    documentId: string
+    sections: DocumentSection[]
+    total: number
+  }> {
+    const query = level ? `?level=${level}` : ''
+    return this.request(`/structure/${documentId}/flat${query}`)
+  }
+
+  async getStructureRoot(documentId: string): Promise<{
+    documentId: string
+    sections: DocumentSection[]
+    total: number
+  }> {
+    return this.request(`/structure/${documentId}/root`)
+  }
+
+  async getSection(
+    documentId: string,
+    sectionId: string,
+  ): Promise<SectionDetailResponse> {
+    return this.request<SectionDetailResponse>(
+      `/structure/${documentId}/sections/${sectionId}`,
+    )
+  }
+
+  async getSectionChildren(
+    documentId: string,
+    sectionId: string,
+  ): Promise<{
+    parentId: string
+    children: DocumentSection[]
+    total: number
+  }> {
+    return this.request(
+      `/structure/${documentId}/sections/${sectionId}/children`,
+    )
+  }
+
+  // ============================================================================
+  // RISCOS
+  // ============================================================================
+
+  async getRisks(
+    documentId: string,
+    params?: {
+      category?: string
+      severity?: ImportanceLevel
+      sortBy?: string
+    },
+  ): Promise<RisksResponse> {
+    const searchParams = new URLSearchParams()
+    if (params?.category) searchParams.set('category', params.category)
+    if (params?.severity) searchParams.set('severity', params.severity)
+    if (params?.sortBy) searchParams.set('sortBy', params.sortBy)
+
+    const query = searchParams.toString()
+    return this.request<RisksResponse>(
+      `/risks/${documentId}${query ? `?${query}` : ''}`,
+    )
+  }
+
+  async getRisksCritical(documentId: string): Promise<{
+    documentId: string
+    risks: Risk[]
+    total: number
+  }> {
+    return this.request(`/risks/${documentId}/critical`)
+  }
+
+  async getRisksByCategory(documentId: string): Promise<{
+    documentId: string
+    categories: Array<{
+      category: string
+      risks: Risk[]
+      count: number
+    }>
+  }> {
+    return this.request(`/risks/${documentId}/by-category`)
+  }
+
+  async getRisk(documentId: string, riskId: string): Promise<Risk> {
+    return this.request(`/risks/${documentId}/${riskId}`)
   }
 }
 

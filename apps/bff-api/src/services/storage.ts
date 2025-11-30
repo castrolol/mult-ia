@@ -1,7 +1,9 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3';
+import { Readable } from 'stream';
 
 let s3Client: S3Client | null = null;
 
@@ -44,5 +46,35 @@ export async function uploadFile(
 
   console.log(`✓ Arquivo uploaded: ${key}`);
   return key;
+}
+
+/**
+ * Baixa um arquivo do S3/MinIO
+ * @param key - Chave do arquivo no bucket
+ * @returns Buffer com o conteúdo do arquivo
+ */
+export async function downloadFile(key: string): Promise<Buffer> {
+  const client = getS3Client();
+
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+    })
+  );
+
+  if (!response.Body) {
+    throw new Error(`Arquivo não encontrado: ${key}`);
+  }
+
+  // Converter stream para Buffer
+  const stream = response.Body as Readable;
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks);
 }
 

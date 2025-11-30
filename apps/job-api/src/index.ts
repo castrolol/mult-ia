@@ -70,7 +70,7 @@ async function main() {
     setProcessHandler(processDocument);
 
     // Iniciar servidor
-    const port = parseInt(process.env.PORT || '3001', 10);
+    const port = parseInt(process.env.PORT || '3002', 10);
 
     console.log(`\n🚀 Job API rodando em http://localhost:${port}`);
     console.log('');

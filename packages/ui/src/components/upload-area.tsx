@@ -1,7 +1,6 @@
 'use client'
 
 import { FileUp } from 'lucide-react'
-import { Button } from '@workspace/ui/components/button'
 import {
   Dropzone,
   DropzoneEmptyState,
@@ -31,18 +30,18 @@ export function UploadArea({ className, ...props }: UploadAreaProps) {
             </div>
             <div className="flex max-w-[480px] flex-col items-center gap-2.5">
               <p className="text-center text-xl font-bold leading-tight tracking-tight text-foreground">
-                Drag & drop PDF here
+                Arraste e solte o PDF aqui
               </p>
               <p className="text-center text-sm font-normal leading-relaxed text-muted-foreground">
-                Supports .pdf files up to 25MB
+                Suporta arquivos .pdf até 25MB
               </p>
             </div>
-            <Button
-              className="flex min-w-[84px] max-w-[480px] shadow-sm"
-              variant="default"
+            {/* Usar span estilizado em vez de Button para evitar botões aninhados */}
+            <span
+              className="flex min-w-[84px] max-w-[480px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
             >
-              <span className="truncate">Browse files</span>
-            </Button>
+              <span className="truncate">Procurar arquivos</span>
+            </span>
           </div>
         </DropzoneEmptyState>
       </Dropzone>

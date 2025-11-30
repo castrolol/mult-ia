@@ -65,7 +65,7 @@ async function main() {
     await connectDatabase();
 
     // Iniciar servidor
-    const port = parseInt(process.env.PORT || '3000', 10);
+    const port = parseInt(process.env.PORT || '3001', 10);
     
     console.log(`\n🚀 BFF API rodando em http://localhost:${port}`);
     console.log('');

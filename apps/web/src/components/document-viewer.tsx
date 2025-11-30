@@ -1,49 +1,60 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   ArrowLeft,
   FileText,
-  MessageCircle,
-  Menu,
-  PanelLeftClose,
-  Sparkles,
   Loader2,
   AlertCircle,
   Play,
+  List,
+  Calendar,
 } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
-import {
-  HierarchyTree,
-  HierarchyTreeHeader,
-  HierarchyTreeContent,
-  HierarchyTreeItem,
-  type HierarchyTreeItemData,
-} from '@workspace/ui/components/hierarchy-tree'
-import {
-  Timeline,
-  TimelineHeader,
-  TimelineContent,
-  TimelineItem,
-  type TimelineItemData,
-} from '@workspace/ui/components/timeline'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@workspace/ui/components/card'
-import { useDocument, useProcessDocument } from '@/lib/hooks/use-documents'
-import type { Entity, Deadline, Penalty } from '@/lib/api-client'
+import {
+  useDocument,
+  useDocumentPdfUrl,
+  useProcessDocument,
+  useTimeline,
+  useStructure,
+} from '@/lib/hooks'
+import type { DocumentSection, TimelineEvent } from '@/lib/api-client'
+import { documentStatus, ui } from '@/lib/i18n'
+import { HierarchyTree, SectionDetail } from './hierarchy-tree'
+import { TimelineView, EventDetail } from './timeline-view'
+import { CommentsPanel } from './comments-panel'
+
+// Dynamic import para evitar SSR do PDF.js (usa DOMMatrix que não existe no servidor)
+const PdfViewerWithStates = dynamic(
+  () => import('./pdf-viewer').then((mod) => mod.PdfViewerWithStates),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Carregando visualizador...</p>
+        </div>
+      </div>
+    ),
+  }
+)
+
+type SelectedItemType = 'hierarchy' | 'timeline'
 
 interface SelectedItem {
-  id: string
-  title: string
-  content?: string
-  notes?: Array<{ author?: string; date?: string; text: string }>
-  breadcrumb?: string[]
-  type: 'hierarchy' | 'timeline'
+  type: SelectedItemType
+  section?: DocumentSection
+  event?: TimelineEvent
 }
 
 interface DocumentViewerProps {
@@ -55,232 +66,96 @@ export function DocumentViewer({
   documentId,
   documentName: propDocumentName,
 }: DocumentViewerProps) {
-  const { document, entities, deadlines, timeline, loading, error } =
-    useDocument(documentId)
-  const { process, processing } = useProcessDocument()
+  const {
+    data: document,
+    isLoading: docLoading,
+    error: docError,
+    refetch: refetchDoc,
+  } = useDocument(documentId)
+  const processMutation = useProcessDocument()
+  const {
+    data: timelineData,
+    isLoading: timelineLoading,
+    error: timelineError,
+  } = useTimeline(documentId)
+  const {
+    data: structureData,
+    isLoading: structureLoading,
+    error: structureError,
+  } = useStructure(documentId)
+  
+  // Buscar URL do PDF apenas quando documento estiver completo
+  const shouldFetchPdf = documentId && document?.status === 'COMPLETED'
+  const {
+    data: pdfData,
+    isLoading: pdfLoading,
+    error: pdfError,
+    refetch: refetchPdf,
+  } = useDocumentPdfUrl(shouldFetchPdf ? documentId : undefined)
+
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null)
-  const [isAsideVisible, setIsAsideVisible] = useState(true)
+  const [activeTab, setActiveTab] = useState<'hierarquia' | 'timeline'>(
+    'hierarquia',
+  )
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [selectedEventForComments, setSelectedEventForComments] =
+    useState<TimelineEvent | null>(null)
 
   const documentName =
-    propDocumentName || document?.filename || 'document_name.pdf'
+    propDocumentName || document?.filename || 'documento.pdf'
+  const statusLabel = document?.status
+    ? documentStatus[document.status]
+    : ''
 
-  const handleHierarchySelect = (item: HierarchyTreeItemData) => {
-    setSelectedItem({
-      id: item.id,
-      title: item.label,
-      content: item.content,
-      notes: item.notes,
-      breadcrumb: item.breadcrumb,
-      type: 'hierarchy',
-    })
+  const timeline = timelineData?.allEvents || []
+  const structure = structureData?.tree || []
+
+  const handleHierarchySelect = (section: DocumentSection) => {
+    setSelectedItem({ type: 'hierarchy', section })
   }
 
-  const handleTimelineSelect = (item: TimelineItemData) => {
-    setSelectedItem({
-      id: item.id,
-      title: item.title,
-      content: item.content,
-      notes: item.notes,
-      breadcrumb: item.breadcrumb || [documentName, item.title],
-      type: 'timeline',
-    })
+  const handleTimelineSelect = (event: TimelineEvent) => {
+    setSelectedItem({ type: 'timeline', event })
   }
 
-  const getItemNotes = (
-    itemId: string,
-    defaultNotes?: SelectedItem['notes'],
-  ) => {
-    return defaultNotes || []
+  const handleCommentsClick = (event: TimelineEvent) => {
+    setSelectedEventForComments(event)
+    setCommentsOpen(true)
   }
 
   const handleProcessDocument = async () => {
     if (!documentId) return
     try {
-      await process(documentId)
-      // Refresh will happen automatically via useDocument hook
+      await processMutation.mutateAsync(documentId)
+      await refetchDoc()
     } catch (err) {
-      console.error('Error processing document:', err)
+      console.error('Erro ao processar documento:', err)
     }
   }
 
-  // Convert entities to hierarchy tree structure
-  const entityHierarchy = useMemo(() => {
-    if (!entities || entities.length === 0) {
-      return {
-        rootEntities: [] as Entity[],
-        childMap: new Map<string, Entity[]>(),
-      }
-    }
-
-    // Group entities by parent
-    const rootEntities = entities.filter((e) => !e.parentId)
-    const childMap = new Map<string, Entity[]>()
-    entities.forEach((e) => {
-      if (e.parentId) {
-        if (!childMap.has(e.parentId)) {
-          childMap.set(e.parentId, [])
-        }
-        childMap.get(e.parentId)?.push(e)
-      }
-    })
-
-    return { rootEntities, childMap }
-  }, [entities])
-
-  // Render entity hierarchy recursively
-  const renderEntityItem = (entity: Entity) => {
-    const children = entityHierarchy.childMap.get(entity.id) || []
-    const breadcrumb = [documentName, entity.name]
-
-    return (
-      <HierarchyTreeItem
-        key={entity.id}
-        id={entity.id}
-        label={entity.name}
-        defaultExpanded={children.length > 0}
-        content={entity.description || entity.sourceText || ''}
-        notes={
-          entity.metadata
-            ? [
-                {
-                  author: 'Sistema',
-                  date: new Date(entity.createdAt).toLocaleString('pt-BR'),
-                  text: `Tipo: ${entity.type} | Prioridade: ${entity.priority}`,
-                },
-              ]
-            : []
-        }
-        breadcrumb={breadcrumb}
-        isActive={selectedItem?.id === entity.id}
-        onSelect={handleHierarchySelect}
-      >
-        {children.map(renderEntityItem)}
-      </HierarchyTreeItem>
-    )
-  }
-
-  // Render deadline hierarchy
-  const renderDeadlineItem = (deadline: Deadline) => {
-    const hasRules = deadline.rules.length > 0
-    const hasPenalties = deadline.penalties && deadline.penalties.length > 0
-
-    return (
-      <HierarchyTreeItem
-        key={deadline.id}
-        id={deadline.id}
-        label={deadline.title}
-        defaultExpanded={hasRules || hasPenalties}
-        content={`${deadline.description}\n\nPrazo: ${new Date(deadline.dueDate).toLocaleDateString('pt-BR')}\nPrioridade: ${deadline.priority}`}
-        notes={[
-          {
-            author: 'Sistema',
-            date: new Date(deadline.createdAt).toLocaleString('pt-BR'),
-            text: `Status: ${deadline.status}`,
-          },
-        ]}
-        breadcrumb={[documentName, deadline.title]}
-        isActive={selectedItem?.id === deadline.id}
-        onSelect={handleHierarchySelect}
-      >
-        {hasRules && (
-          <HierarchyTreeItem
-            id={`rules-${deadline.id}`}
-            label="Regras"
-            content={`Total de ${deadline.rules.length} regras`}
-            breadcrumb={[documentName, deadline.title, 'Regras']}
-            isActive={selectedItem?.id === `rules-${deadline.id}`}
-            onSelect={handleHierarchySelect}
-          >
-            {deadline.rules.map((rule: string, index: number) => (
-              <HierarchyTreeItem
-                key={`rule-${deadline.id}-${index}`}
-                id={`rule-${deadline.id}-${index}`}
-                label={`Regra ${index + 1}`}
-                content={rule}
-                breadcrumb={[
-                  documentName,
-                  deadline.title,
-                  'Regras',
-                  `Regra ${index + 1}`,
-                ]}
-                isActive={selectedItem?.id === `rule-${deadline.id}-${index}`}
-                onSelect={handleHierarchySelect}
-              />
-            ))}
-          </HierarchyTreeItem>
-        )}
-        {hasPenalties && (
-          <HierarchyTreeItem
-            id={`penalties-${deadline.id}`}
-            label="Multas"
-            content={`Total de ${deadline.penalties?.length || 0} multas`}
-            breadcrumb={[documentName, deadline.title, 'Multas']}
-            isActive={selectedItem?.id === `penalties-${deadline.id}`}
-            onSelect={handleHierarchySelect}
-          >
-            {deadline.penalties?.map((penalty: Penalty) => (
-              <HierarchyTreeItem
-                key={penalty.id}
-                id={penalty.id}
-                label={`Multa: ${penalty.description}`}
-                content={`Tipo: ${penalty.type} | Valor: ${penalty.value} ${penalty.currency || 'BRL'}`}
-                breadcrumb={[
-                  documentName,
-                  deadline.title,
-                  'Multas',
-                  penalty.description,
-                ]}
-                isActive={selectedItem?.id === penalty.id}
-                onSelect={handleHierarchySelect}
-              />
-            ))}
-          </HierarchyTreeItem>
-        )}
-      </HierarchyTreeItem>
-    )
-  }
-
-  // Convert timeline events to timeline items
-  const timelineItems = useMemo(() => {
-    if (!timeline || timeline.length === 0) return []
-
-    return timeline.map((event) => ({
-      id: event.id,
-      title: event.title,
-      description: event.description,
-      date: event.date,
-      time: event.time || undefined,
-      content: event.metadata
-        ? JSON.stringify(event.metadata, null, 2)
-        : event.description,
-      notes: [],
-      breadcrumb: [documentName, event.title],
-    }))
-  }, [timeline, documentName])
-
-  // Loading state
-  if (loading) {
+  // Estado de carregamento
+  if (docLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Carregando documento...</p>
+          <p className="text-muted-foreground">{ui.carregandoDocumentos}</p>
         </div>
       </div>
     )
   }
 
-  // Error state
-  if (error || !document) {
+  // Estado de erro
+  if (docError || !document) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">
-            Erro ao carregar documento
+            {ui.erroCarregarDocumento}
           </h2>
           <p className="text-muted-foreground">
-            {error || 'Documento não encontrado'}
+            {docError?.message || ui.documentoNaoEncontrado}
           </p>
         </div>
       </div>
@@ -288,9 +163,9 @@ export function DocumentViewer({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col h-screen">
       {/* AppBar */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b px-5 py-3">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/">
@@ -300,179 +175,192 @@ export function DocumentViewer({
                 className="gap-2 hover:bg-muted/50 transition-all duration-200"
               >
                 <ArrowLeft size={16} />
-                Voltar
+                {ui.voltar}
               </Button>
             </Link>
             <div className="h-6 w-px bg-border" />
-            <h1 className="text-lg font-semibold truncate max-w-md">
-              {documentName}
-            </h1>
-            {document.status === 'pending' && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleProcessDocument}
-                disabled={processing}
-                className="gap-2"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <Play size={16} />
-                    Processar Documento
-                  </>
-                )}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-primary" />
+              <h1 className="text-lg font-semibold truncate max-w-md">
+                {documentName}
+              </h1>
+            </div>
+            <span className="text-xs bg-muted px-2 py-1 rounded">
+              {statusLabel}
+            </span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsAsideVisible(!isAsideVisible)}
-            className="gap-2 hover:bg-muted/50 transition-all duration-200"
-            title={
-              isAsideVisible
-                ? 'Ocultar painel lateral'
-                : 'Exibir painel lateral'
-            }
-          >
-            {isAsideVisible ? (
-              <>
-                <PanelLeftClose size={16} />
-                <span className="hidden sm:inline">Ocultar Painel</span>
-              </>
-            ) : (
-              <>
-                <Menu size={16} />
-                <span className="hidden sm:inline">Exibir Painel</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-      <div className="flex h-screen w-full px-5 py-2 gap-5 bg-background/95">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
-          {/* Left Section: Timeline + DetailPanel (2/3 width) */}
-          <div className="lg:col-span-2 flex flex-col lg:flex-row gap-5">
-            <aside
-              className={`flex flex-col w-full lg:w-80 shrink-0 gap-5 transition-all duration-300 ease-in-out ${
-                isAsideVisible
-                  ? 'translate-x-0 opacity-100'
-                  : '-translate-x-full opacity-0 absolute pointer-events-none'
-              }`}
+
+          {document.status === 'PENDING' && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleProcessDocument}
+              disabled={processMutation.isPending}
+              className="gap-2"
             >
-              {/* Timeline */}
-              <Timeline className="h-full w-full">
-                <TimelineHeader>Timeline</TimelineHeader>
-                <TimelineContent>
-                  {timelineItems.length > 0 ? (
-                    timelineItems.map((item) => (
-                      <TimelineItem
-                        key={item.id}
-                        id={item.id}
-                        title={item.title}
-                        description={item.description}
-                        date={item.date}
-                        time={item.time}
-                        content={item.content}
-                        notes={item.notes}
-                        breadcrumb={item.breadcrumb}
-                        isActive={selectedItem?.id === item.id}
-                        onSelect={handleTimelineSelect}
-                      />
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-muted-foreground">
-                      Nenhum evento na timeline ainda
-                    </div>
-                  )}
-                </TimelineContent>
-              </Timeline>
-            </aside>
-
-            {/* Main Content - Detail Panel (Maximized) */}
-            <Card className={`flex-1 transition-all duration-300 ease-in-out`}>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <FileText size={16} className="text-primary" />
-                  Conteúdo
-                </CardTitle>
-              </CardHeader>
-              {selectedItem ? (
-                <CardContent>
-                  <p>
-                    {selectedItem.content ||
-                      'Sem conteúdo disponível para este item.'}
-                  </p>
-                </CardContent>
+              {processMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {ui.processando}
+                </>
               ) : (
-                <CardContent className="flex flex-col items-center justify-center gap-2">
-                  <Sparkles size={16} className="text-primary" />
-                  <div className="flex flex-col gap-2">
-                    <p>Que tal começar explorando o documento?</p>
-                    <p>
-                      Selecione um item na timeline ou hierarquia para ver os
-                      detalhes.
-                    </p>
-                  </div>
-                </CardContent>
+                <>
+                  <Play size={16} />
+                  {ui.processar}
+                </>
               )}
-            </Card>
-          </div>
+            </Button>
+          )}
+        </div>
+      </header>
 
-          {/* Right Section: HierarchyTree + Comments (1/3 width) */}
-          <div className="flex flex-col gap-5">
-            <HierarchyTree className="flex-1">
-              <HierarchyTreeHeader>Hierarquia</HierarchyTreeHeader>
-              <HierarchyTreeContent>
-                {entityHierarchy.rootEntities.length > 0 ||
-                (deadlines && deadlines.length > 0) ? (
-                  <>
-                    {entityHierarchy.rootEntities.map(renderEntityItem)}
-                    {deadlines?.map(renderDeadlineItem)}
-                  </>
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground">
-                    Nenhum item na hierarquia ainda
-                    {document.status === 'pending' && (
-                      <p className="text-sm mt-2">
-                        Processe o documento para ver a hierarquia
+      {/* Conteúdo principal */}
+      <div className="flex-1 flex overflow-hidden bg-muted/30">
+        {/* Sidebar esquerda - Abas Hierarquia/Timeline */}
+        <aside className="w-80 flex flex-col bg-background shadow-sm">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as 'hierarquia' | 'timeline')}
+            className="flex flex-col h-full"
+          >
+            <div className="p-3 pb-0">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="hierarquia" className="gap-1.5">
+                  <List size={14} />
+                  {ui.hierarquia}
+                </TabsTrigger>
+                <TabsTrigger value="timeline" className="gap-1.5">
+                  <Calendar size={14} />
+                  Timeline
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="hierarquia" className="flex-1 overflow-auto m-0 mt-2">
+              {structureLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : structureError ? (
+                <div className="p-4 text-center text-destructive">
+                  {structureError.message}
+                </div>
+              ) : (
+                <HierarchyTree
+                  sections={structure}
+                  selectedId={selectedItem?.section?.id}
+                  onSelect={handleHierarchySelect}
+                />
+              )}
+            </TabsContent>
+
+            <TabsContent value="timeline" className="flex-1 overflow-auto m-0 mt-2">
+              {timelineLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : timelineError ? (
+                <div className="p-4 text-center text-destructive">
+                  {timelineError.message}
+                </div>
+              ) : (
+                <TimelineView
+                  events={timeline}
+                  selectedId={selectedItem?.event?.id}
+                  onSelect={handleTimelineSelect}
+                  onCommentsClick={handleCommentsClick}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        </aside>
+
+        {/* Área central - PDF Viewer com margens */}
+        <main className="flex-1 flex flex-col overflow-hidden p-4">
+          <div className="flex-1 rounded-xl overflow-hidden bg-background shadow-lg border">
+            {document.status === 'COMPLETED' ? (
+              <PdfViewerWithStates
+                url={pdfData?.url}
+                isLoading={pdfLoading}
+                error={pdfError}
+                onRetry={() => refetchPdf()}
+                className="h-full"
+              />
+            ) : (
+              <div className="flex-1 h-full flex items-center justify-center bg-muted/20">
+                <div className="text-center text-muted-foreground">
+                  <FileText className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                  {document.status === 'PENDING' ? (
+                    <>
+                      <p className="font-medium">Documento pendente</p>
+                      <p className="text-sm">
+                        Processe o documento para visualizar o PDF
                       </p>
-                    )}
-                  </div>
-                )}
-              </HierarchyTreeContent>
-            </HierarchyTree>
-
-            {/* Comments Section - Below HierarchyTree */}
-            {selectedItem && (
-              <Card className="flex flex-col gap-3">
-                <CardHeader>
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <MessageCircle size={16} className="text-primary" />
-                    Comentários
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-                    {getItemNotes(selectedItem.id, selectedItem.notes).map(
-                      (note, index) => (
-                        <p key={`${selectedItem.id}-note-${index}`}>
-                          {note.text}
-                        </p>
-                      ),
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                    </>
+                  ) : document.status === 'PROCESSING' ? (
+                    <>
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                      <p className="font-medium">Processando documento...</p>
+                    </>
+                  ) : (
+                    <p>PDF não disponível</p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-        </div>
+        </main>
+
+        {/* Sidebar direita - Detalhes */}
+        <aside className="w-96 flex flex-col bg-background shadow-sm">
+          <Card className="flex-1 border-0 rounded-none">
+            <CardHeader className="border-b px-4 py-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <FileText size={16} className="text-primary" />
+                {ui.conteudo}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto p-0">
+              {selectedItem?.type === 'hierarchy' && selectedItem.section ? (
+                <SectionDetail section={selectedItem.section} />
+              ) : selectedItem?.type === 'timeline' && selectedItem.event ? (
+                <EventDetail event={selectedItem.event} />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
+                  <FileText className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="font-medium">{ui.quetalComecar}</p>
+                  <p className="text-sm mt-1">{ui.selecioneItem}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
       </div>
+
+      {/* Painel de comentários */}
+      {selectedEventForComments && documentId && (
+        <CommentsPanel
+          documentId={documentId}
+          eventId={selectedEventForComments.id}
+          eventTitle={selectedEventForComments.title}
+          isOpen={commentsOpen}
+          onClose={() => {
+            setCommentsOpen(false)
+            setSelectedEventForComments(null)
+          }}
+        />
+      )}
+
+      {/* Overlay para fechar comentários */}
+      {commentsOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 z-40"
+          onClick={() => {
+            setCommentsOpen(false)
+            setSelectedEventForComments(null)
+          }}
+        />
+      )}
     </div>
   )
 }
