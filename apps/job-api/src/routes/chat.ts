@@ -111,7 +111,7 @@ chat.post('/:documentId/new', async (c) => {
       return c.json({ error: 'Documento não encontrado' }, 404);
     }
 
-    const body = await c.req.json<{ title?: string }>().catch(() => ({}));
+    const body = await c.req.json<{ title?: string }>().catch(() => ({} as { title?: string }));
 
     const chatService = getChatService();
     const conversation = await chatService.createConversation(documentId, body.title);
@@ -283,7 +283,7 @@ chat.post('/:documentId/rag/prepare', async (c) => {
     }
 
     const ragService = getRagService();
-    const body = await c.req.json<{ regenerate?: boolean }>().catch(() => ({}));
+    const body = await c.req.json<{ regenerate?: boolean }>().catch(() => ({} as { regenerate?: boolean }));
 
     let result;
     if (body.regenerate) {

@@ -16,9 +16,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
   let normB = 0;
 
   for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+    const aVal = a[i]!;
+    const bVal = b[i]!;
+    dotProduct += aVal * bVal;
+    normA += aVal * aVal;
+    normB += bVal * bVal;
   }
 
   const denominator = Math.sqrt(normA) * Math.sqrt(normB);
@@ -112,7 +114,7 @@ export class EmbeddingService {
         pageId: page.id,
         pageNumber: page.pageNumber,
         text: page.text,
-        embedding: embeddings[idx],
+        embedding: embeddings[idx]!,
         createdAt: now,
       }));
 

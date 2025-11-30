@@ -41,7 +41,7 @@ chat.get('/:documentId', async (c) => {
  */
 chat.post('/:documentId/new', async (c) => {
   const documentId = c.req.param('documentId');
-  const body = await c.req.json<{ title?: string }>().catch(() => ({}));
+  const body = await c.req.json<{ title?: string }>().catch(() => ({} as { title?: string }));
   const result = await chatApi.createConversation(documentId, body.title);
   return c.json(result, 201);
 });
@@ -62,7 +62,7 @@ chat.get('/:documentId/rag/status', async (c) => {
  */
 chat.post('/:documentId/rag/prepare', async (c) => {
   const documentId = c.req.param('documentId');
-  const body = await c.req.json<{ regenerate?: boolean }>().catch(() => ({}));
+  const body = await c.req.json<{ regenerate?: boolean }>().catch(() => ({} as { regenerate?: boolean }));
   const result = await chatApi.prepareRag(documentId, body.regenerate);
   return c.json(result);
 });
