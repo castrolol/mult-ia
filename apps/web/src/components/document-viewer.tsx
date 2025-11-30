@@ -1,37 +1,37 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
-import dynamic from 'next/dynamic'
+import type { DocumentSection, TimelineEvent } from '@/lib/api-client'
 import {
-  ArrowLeft,
-  FileText,
-  Loader2,
-  AlertCircle,
-  Play,
-  List,
-  Calendar,
-} from 'lucide-react'
+  useDocument,
+  useDocumentPdfUrl,
+  useProcessDocument,
+  useStructure,
+  useTimeline,
+} from '@/lib/hooks'
+import { documentStatus, ui } from '@/lib/i18n'
 import { Button } from '@workspace/ui/components/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@workspace/ui/components/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs'
 import {
-  useDocument,
-  useDocumentPdfUrl,
-  useProcessDocument,
-  useTimeline,
-  useStructure,
-} from '@/lib/hooks'
-import type { DocumentSection, TimelineEvent } from '@/lib/api-client'
-import { documentStatus, ui } from '@/lib/i18n'
-import { HierarchyTree, SectionDetail } from './hierarchy-tree'
-import { TimelineView, EventDetail } from './timeline-view'
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
+  FileText,
+  List,
+  Loader2,
+  Play,
+} from 'lucide-react'
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { useState } from 'react'
 import { CommentsPanel } from './comments-panel'
+import { HierarchyTree, SectionDetail } from './hierarchy-tree'
+import { EventDetail, TimelineView } from './timeline-view'
 
 // Dynamic import para evitar SSR do PDF.js (usa DOMMatrix que não existe no servidor)
 const PdfViewerWithStates = dynamic(
