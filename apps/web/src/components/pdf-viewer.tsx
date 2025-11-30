@@ -138,8 +138,8 @@ export function PdfViewer({
     </div>
   )
 
-  // Renderizar conteúdo do highlight (tooltip)
-  const renderHighlightContent = (props: RenderHighlightContentProps) => null
+  // Renderizar conteúdo do highlight (tooltip) - retorna fragmento vazio
+  const renderHighlightContent = (_props: RenderHighlightContentProps) => <></>
 
   // Plugin de highlight
   const highlightPluginInstance = highlightPlugin({
