@@ -45,3 +45,11 @@ export {
   useRisk,
   riskKeys,
 } from './use-risks'
+
+// Hooks de posição de texto no PDF
+export {
+  useTextPosition,
+  usePrefetchPositions,
+  type EntityPositionData,
+  type UseTextPositionResult,
+} from './use-text-position'

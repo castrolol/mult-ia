@@ -8,6 +8,8 @@ import {
   useStructure,
   useTimeline,
   useRisks,
+  useTextPosition,
+  type EntityPositionData,
 } from '@/lib/hooks'
 import { documentStatus, ui } from '@/lib/i18n'
 import { Button } from '@workspace/ui/components/button'
@@ -28,7 +30,8 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import type { PdfHighlightData } from './pdf-viewer'
 import { CommentsPanel } from './comments-panel'
 import { HierarchyTree } from './hierarchy-tree'
 import { TimelineView } from './timeline-view'
@@ -110,6 +113,89 @@ export function DocumentViewer({
   const [zoomLevel, setZoomLevel] = useState(100)
   const [currentPage, setCurrentPage] = useState(1)
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null)
+
+  // Extrai dados da entidade selecionada para busca de posição
+  const selectedEntityData = useMemo((): EntityPositionData | null => {
+    if (!selectedItem) return null
+
+    if (selectedItem.type === 'hierarchy' && selectedItem.section) {
+      const section = selectedItem.section
+      // Seções têm sourcePages como array
+      const pageNumber = section.sourcePages?.[0] || 1
+      const sourceText = section.title || section.summary || ''
+      if (!sourceText) return null
+      return {
+        id: section.id,
+        pageNumber,
+        sourceText,
+      }
+    }
+
+    if (selectedItem.type === 'timeline' && selectedItem.event) {
+      const event = selectedItem.event
+      // Eventos têm sourcePages como array
+      const pageNumber = event.sourcePages?.[0] || 1
+      // Usar título e descrição como texto de busca
+      const sourceText = event.title || event.description || ''
+      if (!sourceText) return null
+      return {
+        id: event.id,
+        pageNumber,
+        sourceText,
+      }
+    }
+
+    if (selectedItem.type === 'risk' && selectedItem.risk) {
+      const risk = selectedItem.risk
+      // Riscos têm sources com excerpt
+      const firstSource = risk.sources?.[0]
+      const pageNumber = firstSource?.pageNumber || 1
+      // Usar excerpt da fonte ou título/descrição
+      const sourceText = firstSource?.excerpt || risk.title || risk.description || ''
+      if (!sourceText) return null
+      return {
+        id: risk.id,
+        pageNumber,
+        sourceText,
+      }
+    }
+
+    return null
+  }, [selectedItem])
+
+  // Hook para buscar posição do texto no PDF
+  const { positions: textPositions, isLoading: positionLoading } = useTextPosition(
+    documentId,
+    pdfData?.url,
+    selectedEntityData
+  )
+
+  // Converte posições para formato de highlight do PdfViewer
+  const pdfHighlights = useMemo((): PdfHighlightData[] => {
+    if (!textPositions || !selectedEntityData) return []
+
+    return [{
+      id: `highlight-${selectedEntityData.id}`,
+      content: selectedEntityData.sourceText.substring(0, 100) + (selectedEntityData.sourceText.length > 100 ? '...' : ''),
+      highlightAreas: textPositions.map(pos => ({
+        pageIndex: pos.pageIndex,
+        left: pos.left,
+        top: pos.top,
+        width: pos.width,
+        height: pos.height,
+      })),
+      quote: selectedEntityData.sourceText,
+      entityId: selectedEntityData.id,
+      entityType: selectedItem?.type,
+    }]
+  }, [textPositions, selectedEntityData, selectedItem?.type])
+
+  // Navega para a página quando uma entidade é selecionada
+  useEffect(() => {
+    if (selectedEntityData && selectedEntityData.pageNumber > 0) {
+      setCurrentPage(selectedEntityData.pageNumber)
+    }
+  }, [selectedEntityData])
 
   const documentName =
     propDocumentName || document?.filename || 'documento.pdf'
@@ -306,6 +392,7 @@ export function DocumentViewer({
               currentPage={currentPage}
               onPageChange={handlePdfPageChange}
               onDocumentLoad={handlePdfLoad}
+              highlights={pdfHighlights}
             />
           ) : (
             <div className="flex-1 h-full flex items-center justify-center bg-muted/20">
