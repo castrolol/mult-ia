@@ -245,7 +245,7 @@ export function ChatPanel({ documentId, documentName, className }: ChatPanelProp
               <Bot className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-bold text-foreground text-sm">Lumi AI</h3>
+              <h3 className="font-bold text-foreground text-sm">Lumi - Assistente de IA</h3>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 <span className="text-xs text-muted-foreground">Online</span>
