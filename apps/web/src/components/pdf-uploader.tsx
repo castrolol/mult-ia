@@ -100,10 +100,10 @@ export function PDFUploader() {
           prev.map((f) =>
             f.id === tempId
               ? {
-                  ...f,
-                  status: 'error',
-                  error: err instanceof Error ? err.message : ui.erroUpload,
-                }
+                ...f,
+                status: 'error',
+                error: err instanceof Error ? err.message : ui.erroUpload,
+              }
               : f
           )
         )
@@ -143,64 +143,9 @@ export function PDFUploader() {
       <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-4 py-8 lg:py-12">
         {/* Brand Header */}
         <div className="text-center mb-8 lg:mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="flex justify-center items-center gap-4 mb-4">
-            <div className="w-16 h-16 relative">
-              <svg
-                viewBox="0 0 100 120"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-full drop-shadow-xl"
-              >
-                <path
-                  d="M20 10 C 12 10 5 17 5 25 V 95 C 5 103 12 110 20 110 H 80 C 88 110 95 103 95 95 V 35 L 70 10 H 20 Z"
-                  stroke="currentColor"
-                  strokeWidth="6"
-                  fill="hsl(var(--card))"
-                  strokeLinejoin="round"
-                  className="text-foreground"
-                />
-                <path
-                  d="M70 10 V 35 H 95"
-                  stroke="currentColor"
-                  strokeWidth="6"
-                  strokeLinejoin="round"
-                  fill="hsl(var(--card))"
-                  className="text-foreground"
-                />
-                <path
-                  d="M25 50 H 75"
-                  stroke="currentColor"
-                  strokeWidth="6"
-                  strokeLinecap="round"
-                  className="text-foreground"
-                />
-                <path
-                  d="M25 70 H 65"
-                  stroke="currentColor"
-                  strokeWidth="6"
-                  strokeLinecap="round"
-                  className="text-foreground"
-                />
-                <path
-                  d="M10 55 C 5 40 25 20 45 25 C 65 30 70 50 60 60 C 50 70 30 70 25 65 C 15 60 15 60 10 55 Z"
-                  fill="hsl(var(--primary))"
-                  opacity="0.9"
-                  style={{ mixBlendMode: 'multiply' }}
-                />
-                <path
-                  d="M60 65 C 75 55 90 65 85 85 C 80 105 60 100 55 90 C 50 80 55 70 60 65 Z"
-                  fill="hsl(var(--chart-4))"
-                  opacity="0.9"
-                  style={{ mixBlendMode: 'multiply' }}
-                />
-              </svg>
-            </div>
-            <h1 className="text-6xl font-black text-foreground tracking-tighter">
-              Mult.
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/70">
-                IA
-              </span>
-            </h1>
+          <div className="flex justify-center items-center gap-4 mb-2">
+
+            <img src="/LogoApp.png" alt="Mult.IA" height={50} className='h-18' />
           </div>
           <p className="text-xl text-muted-foreground font-medium max-w-2xl mx-auto">
             Inteligência Artificial para Análise Contratual Multivisual
