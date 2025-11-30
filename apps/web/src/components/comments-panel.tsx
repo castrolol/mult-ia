@@ -42,7 +42,6 @@ export function CommentsPanel({
 }: CommentsPanelProps) {
   const {
     comments,
-    total,
     loading,
     error,
     add,
@@ -64,7 +63,7 @@ export function CommentsPanel({
     try {
       await add(newComment.trim(), authorName.trim())
       setNewComment('')
-    } catch (err) {
+    } catch {
       // Erro já tratado no hook
     }
   }
@@ -81,7 +80,7 @@ export function CommentsPanel({
       await update(editingId, editContent.trim())
       setEditingId(null)
       setEditContent('')
-    } catch (err) {
+    } catch {
       // Erro já tratado no hook
     }
   }
@@ -96,7 +95,7 @@ export function CommentsPanel({
 
     try {
       await remove(commentId)
-    } catch (err) {
+    } catch {
       // Erro já tratado no hook
     }
   }
@@ -137,7 +136,12 @@ export function CommentsPanel({
         ) : error ? (
           <div className="text-center text-destructive p-4">
             <p>{error}</p>
-            <Button variant="outline" size="sm" onClick={refetch} className="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="mt-2"
+            >
               Tentar novamente
             </Button>
           </div>
@@ -365,7 +369,7 @@ export function CommentsInline({
     try {
       await add(newComment.trim(), authorName.trim())
       setNewComment('')
-    } catch (err) {
+    } catch {
       // Erro já tratado no hook
     }
   }
