@@ -54,6 +54,7 @@ async function main() {
     serve({
       fetch: app.fetch,
       port,
+      hostname: '0.0.0.0',
     });
   } catch (error) {
     console.error('Erro ao iniciar servidor:', error);

@@ -45,7 +45,7 @@ async function main() {
 
     // Iniciar servidor
     const port = parseInt(process.env.PORT || '3001', 10);
-    
+
     console.log(`\n🚀 Job API rodando em http://localhost:${port}`);
     console.log('   Endpoints:');
     console.log('   - POST /process       → Iniciar processamento de documento');
@@ -54,6 +54,7 @@ async function main() {
     serve({
       fetch: app.fetch,
       port,
+      hostname: '0.0.0.0',
     });
   } catch (error) {
     console.error('Erro ao iniciar servidor:', error);
